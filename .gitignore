@@ -1,0 +1,19 @@
+# Godot-generated caches and local editor state
+**/.godot/
+**/export_templates/
+**/feature_profiles/
+**/script_templates/
+**/text_editor_themes/
+
+# Local player progress, test artifacts, and exports
+**/saves/
+**/qa/
+**/builds/
+*.log
+*.tmp
+
+# Local-only configuration
+.env
+.env.*
+.DS_Store
+Thumbs.db

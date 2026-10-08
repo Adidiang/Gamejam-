@@ -1,0 +1,26 @@
+; 灵感涌现ing — Godot 4.7 / GDScript
+config_version=5
+
+[application]
+config/name="灵感涌现ing"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/description="经营游戏开发社团，用十二个月把灵感变成作品。"
+config/icon="res://assets/icon.svg"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.06, 0.12, 0.14, 1)
+
+[audio]
+driver/enable_input=false

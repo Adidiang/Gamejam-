@@ -1,0 +1,5 @@
+.godot/
+builds/
+qa/
+saves/
+*.log
