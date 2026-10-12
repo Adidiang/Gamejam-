@@ -1,5 +1,5 @@
 extends Control
-## Original code-drawn artwork. No external textures or downloads required.
+## 活动室代码绘制；人物立绘仅从新人物表读取。
 signal member_clicked(id: int)
 var portrait := false
 var member_id := 0
@@ -8,10 +8,15 @@ var month := 1
 var roles: Array = [0, 0, 1, 2]
 var ticks := 0.0
 var animate := true
-const COLORS := [Color("83b9c7"), Color("ecc36d"), Color("a8ba91"), Color("d4a3b3")]
+const COLORS := [Color("c8d5cd"), Color("c8d5cd"), Color("c8d5cd"), Color("c8d5cd")]
 const INK := Color("264549")
+const Model = preload("res://scripts/game_model.gd")
+const CharacterTable = preload("res://scripts/character_table.gd")
+var portraits: Array[Texture2D] = []
 
 func _ready() -> void:
+	for definition in Model.DEFINITIONS:
+		portraits.append(CharacterTable.portrait_texture(definition.portrait))
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE if portrait else Control.MOUSE_FILTER_STOP
 
@@ -120,26 +125,12 @@ func _draw() -> void:
 		draw_circle(tip, 9, Color("60836b"))
 
 func person(center: Vector2, id: int, scale_factor: float) -> void:
-	var s := scale_factor
-	var skin := Color("efc7a5")
-	var hair: Color = [Color("34484b"), Color("895e42"), Color("454738"), Color("514651")][id]
-	box(Rect2(center + Vector2(-24, 14) * s, Vector2(48, 43) * s), COLORS[id], 13 * s)
-	draw_circle(center + Vector2(0, -8) * s, 24 * s, hair)
-	if id == 2:
-		box(Rect2(center + Vector2(-26, -7) * s, Vector2(52, 42) * s), hair, 9 * s)
-	draw_circle(center, 20 * s, skin)
-	draw_colored_polygon(PackedVector2Array([center + Vector2(-22, -7) * s, center + Vector2(-15, -24) * s, center + Vector2(8, -26) * s, center + Vector2(23, -7) * s, center + Vector2(7, -14) * s, center + Vector2(-3, -5) * s, center + Vector2(-5, -15) * s]), hair)
-	if id == 1:
-		draw_circle(center + Vector2(21, -15) * s, 10 * s, hair)
-		draw_circle(center + Vector2(22, -14) * s, 4 * s, Color("e7a66c"))
-	if id == 0:
-		draw_arc(center + Vector2(-8, 1) * s, 7 * s, 0, TAU, 20, INK, 1.5 * s)
-		draw_arc(center + Vector2(8, 1) * s, 7 * s, 0, TAU, 20, INK, 1.5 * s)
-		draw_line(center + Vector2(-1, 0) * s, center + Vector2(1, 0) * s, INK, s)
-	if id == 3:
-		draw_arc(center + Vector2(0, -4) * s, 24 * s, PI, TAU, 24, COLORS[id].darkened(0.4), 5 * s)
-		box(Rect2(center + Vector2(-28, -5) * s, Vector2(8, 19) * s), INK, 3)
-		box(Rect2(center + Vector2(20, -5) * s, Vector2(8, 19) * s), INK, 3)
-	draw_circle(center + Vector2(-8, 1) * s, 1.7 * s, INK)
-	draw_circle(center + Vector2(8, 1) * s, 1.7 * s, INK)
-	draw_arc(center + Vector2(0, 5) * s, 5 * s, 0.2, PI - 0.2, 12, Color("9a6855"), 1.3 * s)
+	var bounds := Rect2(center + Vector2(-26, -30) * scale_factor, Vector2(52, 86) * scale_factor)
+	var texture: Texture2D = portraits[id]
+	if texture == null:
+		box(bounds, Color("c8d5cd"), 2)
+		return
+	var texture_size := texture.get_size()
+	var ratio := minf(bounds.size.x / texture_size.x, bounds.size.y / texture_size.y)
+	var display_size := texture_size * ratio
+	draw_texture_rect(texture, Rect2(bounds.position + (bounds.size - display_size) / 2, display_size), false)

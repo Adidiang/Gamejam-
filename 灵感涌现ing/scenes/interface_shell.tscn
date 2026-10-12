@@ -1,0 +1,281 @@
+[gd_scene format=3 uid="uid://db451qkg5rp7m"]
+
+[ext_resource type="Script" uid="uid://dwvbk86hhwtmi" path="res://scripts/interface_shell.gd" id="1_shell"]
+[ext_resource type="Texture2D" uid="uid://s7mp8bqo0q83" path="res://assets/backgrounds/clubroom.png" id="2_clubroom"]
+[ext_resource type="Texture2D" uid="uid://bakp7ntcgrtyh" path="res://assets/portraits/a.png" id="3_portrait_a"]
+[ext_resource type="Texture2D" uid="uid://cg6yksmq247mw" path="res://assets/portraits/b.png" id="4_portrait_b"]
+[ext_resource type="Texture2D" uid="uid://bi2hnlyq2w8wn" path="res://assets/portraits/c.png" id="5_portrait_c"]
+
+[node name="InterfaceShell" type="Control" unique_id=32943101]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shell")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1283530969]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.941176, 0.929412, 0.898039, 1)
+
+[node name="StartScreen" type="Control" parent="." unique_id=1324198719]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StartButton" type="Button" parent="StartScreen" unique_id=304761992]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -130.0
+offset_top = -36.0
+offset_right = 130.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "开始游戏"
+
+[node name="MainScreen" type="Control" parent="." unique_id=1979327008]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="TextureRect" parent="MainScreen" unique_id=1190850399]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_clubroom")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CharacterA" type="Button" parent="MainScreen" unique_id=2129898831]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.6
+anchor_top = 0.4
+anchor_right = 0.8
+anchor_bottom = 0.85
+theme_override_font_sizes/font_size = 44
+text = "a"
+
+[node name="Portrait" type="TextureRect" parent="MainScreen/CharacterA" unique_id=1209031752]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_portrait_a")
+expand_mode = 2
+stretch_mode = 5
+
+[node name="CharacterB" type="Button" parent="MainScreen" unique_id=533756746]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.45
+anchor_top = 0.2
+anchor_right = 0.6
+anchor_bottom = 0.7
+theme_override_font_sizes/font_size = 44
+text = "b"
+
+[node name="Portrait" type="TextureRect" parent="MainScreen/CharacterB" unique_id=982781771]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("4_portrait_b")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CharacterC" type="Button" parent="MainScreen" unique_id=2081203572]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.25
+anchor_top = 0.4
+anchor_right = 0.4
+anchor_bottom = 0.84
+theme_override_font_sizes/font_size = 44
+text = "c"
+
+[node name="Portrait" type="TextureRect" parent="MainScreen/CharacterC" unique_id=640105424]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_portrait_c")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CharacterD" type="Button" parent="MainScreen" unique_id=1251232844]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.5
+anchor_right = 0.2
+anchor_bottom = 0.9
+theme_override_font_sizes/font_size = 44
+text = "d"
+
+[node name="TimePanel" type="PanelContainer" parent="MainScreen" unique_id=878887255]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -316.0
+offset_top = 32.0
+offset_right = -32.0
+offset_bottom = 90.0
+grow_horizontal = 0
+
+[node name="TimeLabel" type="Label" parent="MainScreen/TimePanel" unique_id=583995948]
+layout_mode = 2
+text = "第1年1月"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="InspirationPanel" type="PanelContainer" parent="MainScreen" unique_id=1890489935]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -316.0
+offset_top = 100.0
+offset_right = -32.0
+offset_bottom = 150.0
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="InspirationLabel" type="Label" parent="MainScreen/InspirationPanel" unique_id=1356441749]
+layout_mode = 2
+text = "灵感 2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ScheduleButton" type="Button" parent="MainScreen" unique_id=346930276]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -232.0
+offset_top = -104.0
+offset_right = -32.0
+offset_bottom = -32.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "排期"
+
+[node name="StatusPanel" type="PanelContainer" parent="MainScreen"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -952.0
+offset_top = -132.0
+offset_right = -252.0
+offset_bottom = -36.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="StatusColumn" type="VBoxContainer" parent="MainScreen/StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 2
+alignment = 1
+mouse_filter = 2
+
+[node name="ProjectLabel" type="Label" parent="MainScreen/StatusPanel/StatusColumn"]
+layout_mode = 2
+text = "「未命名的灵感」 · 动作 / 科幻"
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="StatusRow" type="HBoxContainer" parent="MainScreen/StatusPanel/StatusColumn"]
+layout_mode = 2
+theme_override_constants/separation = 24
+alignment = 1
+mouse_filter = 2
+
+[node name="GameplayLabel" type="Label" parent="MainScreen/StatusPanel/StatusColumn/StatusRow"]
+layout_mode = 2
+text = "游戏性 0.0"
+vertical_alignment = 1
+
+[node name="InnovationLabel" type="Label" parent="MainScreen/StatusPanel/StatusColumn/StatusRow"]
+layout_mode = 2
+text = "创新性 0.0"
+vertical_alignment = 1
+
+[node name="PresentationLabel" type="Label" parent="MainScreen/StatusPanel/StatusColumn/StatusRow"]
+layout_mode = 2
+text = "表现力 0.0"
+vertical_alignment = 1
+
+[node name="BugLabel" type="Label" parent="MainScreen/StatusPanel/StatusColumn/StatusRow"]
+layout_mode = 2
+text = "Bug 0.0"
+vertical_alignment = 1
+
+[node name="CharacterScreen" type="Control" parent="." unique_id=546986807]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CloseButton" type="Button" parent="CharacterScreen" unique_id=395664420]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -168.0
+offset_top = 32.0
+offset_right = -32.0
+offset_bottom = 88.0
+grow_horizontal = 0
+text = "关闭"

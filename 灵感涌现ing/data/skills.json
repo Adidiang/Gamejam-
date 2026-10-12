@@ -1,0 +1,112 @@
+{
+  "skills": [
+    {
+      "id": "a_skill_1",
+      "name": "白日梦",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "a_skill_2",
+      "name": "梦境讲述",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "a_skill_3",
+      "name": "梦想家",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "b_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "b_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "b_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "c_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "c_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "c_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "d_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "d_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "d_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    }
+  ]
+}

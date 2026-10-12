@@ -1,6 +1,8 @@
 extends Control
 const Model = preload("res://scripts/game_model.gd")
 const Store = preload("res://scripts/save_store.gd")
+const MemberSheet = preload("res://scripts/member_sheet.gd")
+const SkillRunner = preload("res://scripts/skills/skill_runner.gd")
 const RoomArt = preload("res://scripts/room_view.gd")
 const Sounds = preload("res://scripts/audio.gd")
 
@@ -33,6 +35,10 @@ var locked := false
 var return_to_game := false
 
 func _ready() -> void:
+	if Model.DEFINITIONS.size() != 4:
+		push_error("人物或技能表无效，请修正 data 下的配置。")
+		get_tree().quit(1)
+		return
 	qa_mode = "--ui-smoke" in OS.get_cmdline_user_args()
 	get_window().min_size = Vector2i(960, 600)
 	font = SystemFont.new()
@@ -242,7 +248,7 @@ func show_game() -> void:
 		["游戏性", float(work.g), "让人忍不住再玩一次", TEAL],
 		["创新性", float(work.i), "属于我们的奇妙点子", Color("ae8542")],
 		["表现力", Model.performance(work), "视觉 %.1f  /  听觉 %.1f" % [work.v, work.m], Color("8876a0")],
-		["Bug", float(work.b), "开发效率 %d%%" % int(Model.efficiency(float(work.b)) * 100), RED]
+		["Bug", float(work.b), "暂为记录数值", RED]
 	]
 	for index in range(4):
 		var x := 32.0 + index * 275.0
@@ -293,10 +299,10 @@ func member_card(id: int) -> void:
 	var def: Dictionary = Model.DEFINITIONS[id]
 	var member: Dictionary = state.members[id]
 	label_at(def.name, Rect2(x + 89, 531, 112, 30), 23, PAPER if chosen else INK, true)
-	label_at("已学技能" if member.learned else ("技能可解锁" if int(member.affinity) >= 20 else "一起成长中"), Rect2(x + 89, 565, 110, 24), 13, GOLD if chosen else MUTED)
+	label_at("已习得 %d 技能" % member.learned_skills.size(), Rect2(x + 89, 565, 110, 24), 13, GOLD if chosen else MUTED)
 	label_at(Model.ROLES[int(member.role)], Rect2(x + 15, 608, 180, 30), 18, Color("d9e9d6") if chosen else TEAL, true)
-	label_at("好感 %d / 100" % int(member.affinity), Rect2(x + 15, 650, 180, 26), 14, Color("c5d6cb") if chosen else MUTED)
-	meter(Rect2(x + 15, 688, 178, 5), float(member.affinity) / 100.0, GOLD if chosen else TEAL)
+	label_at("好感 %d / %d" % [int(member.affinity), Model.AFFINITY_MAX], Rect2(x + 15, 650, 180, 26), 14, Color("c5d6cb") if chosen else MUTED)
+	meter(Rect2(x + 15, 688, 178, 5), float(member.affinity) / float(Model.AFFINITY_MAX), GOLD if chosen else TEAL)
 
 func show_bottom() -> void:
 	panel(Rect2(32, 730, 421, 138), Color("e2e6d9"))
@@ -307,9 +313,9 @@ func show_bottom() -> void:
 	if next_node == 8:
 		target_text = "目标：游戏性 80 · 创新 65 · 表现 100"
 	elif next_node == 12:
-		target_text = "最佳游戏：80 分 · 三项均 ≥ 50 · Bug ≤ 5"
+		target_text = "最佳游戏：80 分 · 三项均 ≥ 50"
 	label_at(target_text, Rect2(49, 783, 392, 24), 14, MUTED)
-	label_at("Bug ≤ 10 额外得灵感；每项达标 +1" if next_node < 12 else "原始三项属性各 210 点，对应评分 100", Rect2(49, 821, 394, 24), 14, MUTED)
+	label_at("三项属性每项达标 +1 灵感" if next_node < 12 else "原始三项属性各 210 点，对应评分 100", Rect2(49, 821, 394, 24), 14, MUTED)
 	panel(Rect2(469, 730, 453, 138), PAPER)
 	label_at("开发手记", Rect2(487, 741, 420, 30), 17, INK, true)
 	var recent: String = state.log[0] if state.log.size() > 0 else "今天的灵感，还等着大家一起实现。"
@@ -321,7 +327,7 @@ func show_action_panel() -> void:
 	var member: Dictionary = state.members[selected]
 	portrait_at(selected, Rect2(962, 230, 66, 66))
 	label_at(def.name, Rect2(1043, 228, 241, 35), 26, INK, true)
-	label_at(def.tag, Rect2(1043, 264, 339, 28), 16, MUTED)
+	label_at(def.other_modifiers, Rect2(1043, 264, 339, 28), 16, MUTED)
 	var a: Array = Model.ability(state, selected)
 	label_at("编程 %.1f    脑洞 %.1f    美术 %.1f    音乐 %.1f" % a, Rect2(962, 308, 426, 28), 15, MUTED)
 	label_at("当前分工", Rect2(962, 345, 211, 27), 15, INK, true)
@@ -349,28 +355,8 @@ func show_action_panel() -> void:
 		var delta: Dictionary = preview.report.delta
 		label_at("游戏性 +%.1f   创新 +%.1f   表现 +%.1f" % [delta.g, delta.i, delta.p], Rect2(976, 653, 399, 25), 15, TEAL, true)
 		var bug_text := "Bug %+.1f → %.1f" % [delta.b, preview.state.work.b]
-		label_at(bug_text + "    效率 %d%%" % int(preview.report.efficiency * 100), Rect2(976, 688, 400, 23), 14, RED if preview.state.work.b >= 12 else MUTED)
-	var skill_text: String
-	var disabled := false
-	if member.learned:
-		skill_text = "%s · %s产出 +20%%" % [def.skill, ["玩法", "美术", "音效", "修复"][int(def.specialty)]]
-		disabled = true
-	elif int(member.affinity) < 20:
-		skill_text = "%s · 好感 %d/20 解锁" % [def.skill, int(member.affinity)]
-		disabled = true
-	elif int(state.inspiration) < 6:
-		skill_text = "%s · 灵感不足 %d/6" % [def.skill, int(state.inspiration)]
-		disabled = true
-	else:
-		skill_text = "学习 %s  ·  6 灵感 / 不耗回合" % def.skill
-	var skill_button := button_at(skill_text, Rect2(962, 741, 426, 38), func():
-		state = Model.learn(state, selected)
-		persist()
-		sound.play("learn")
-		show_game()
-	, false, null, 15)
-	skill_button.disabled = disabled
-	skill_button.tooltip_text = "好感 20 解锁，消耗 6 灵感习得。\n分配到%s时，自动产出或修复量 +20%%。" % Model.ROLES[int(def.specialty)]
+		label_at(bug_text + "    仅记录数值", Rect2(976, 688, 400, 23), 14, MUTED)
+	button_at("查看／学习三个技能", Rect2(962, 741, 426, 38), show_skills, false, null, 15)
 	var expected_month := int(state.month)
 	commit_button = button_at("执行行动，结束 %02d 月  →" % expected_month, Rect2(962, 796, 426, 50), func(): commit_turn(expected_month), true, null, 20)
 	commit_button.disabled = locked or state.phase != "ready"
@@ -380,7 +366,7 @@ func action_description(id: int, which: int) -> String:
 	var stats: Array = Model.ability(state, id)
 	match which:
 		0:
-			return "好感 +%d；能力随好感提升。连续邀约同一人只 +6。" % Model.invite_gain(state, id)
+			return "好感 +%d；每次邀约固定 +10，上限 50，能力随好感提升。" % Model.invite_gain(state, id)
 		1:
 			return "任务即时：游戏性 +%.1f，Bug +2。" % (1.5 * stats[0])
 		2:
@@ -390,7 +376,7 @@ func action_description(id: int, which: int) -> String:
 		4:
 			return "任务即时：听觉 +%.1f，Bug +1；表现力结合视觉与听觉。" % (1.5 * stats[3])
 		5:
-			return "任务即时：修复最多 %.1f Bug，然后计算本回合开发效率。" % (1.5 * stats[0])
+			return "任务即时：修复最多 %.1f Bug，只改变 Bug 数值。" % (1.5 * stats[0])
 	return ""
 
 func commit_turn(expected_month: int) -> void:
@@ -443,7 +429,7 @@ func show_report() -> void:
 	var id := int(report.member)
 	portrait_at(id, Rect2(395, 253, 68, 68), layer)
 	label_at("%s · %s" % [Model.DEFINITIONS[id].name, Model.ACTIONS[int(report.action)]], Rect2(483, 250, 553, 31), 20, INK, true, layer)
-	label_at(Model.DEFINITIONS[id].quote, Rect2(483, 288, 554, 34), 17, MUTED, false, layer)
+	paragraph(_skill_feedback(report), Rect2(483, 288, 554, 50), 15, MUTED, layer)
 	var delta: Dictionary = report.delta
 	var names := ["游戏性", "创新性", "表现力", "Bug"]
 	var values := [delta.g, delta.i, delta.p, delta.b]
@@ -458,21 +444,19 @@ func show_report() -> void:
 			var target: Dictionary = report.targets[i]
 			var x := 394.0 + (i % 2) * 330
 			var y := 510.0 + int(i / 2) * 43
-			label_at(("达标  " if target.reached else "待提升  ") + target.name + "  %.1f / %s%.0f" % [target.value, "≤" if i == 3 else "", target.target], Rect2(x, y, 323, 35), 16, TEAL if target.reached else RED, false, layer)
+			label_at(("达标  " if target.reached else "待提升  ") + target.name + "  %.1f / %.0f" % [target.value, target.target], Rect2(x, y, 323, 35), 16, TEAL if target.reached else RED, false, layer)
 	else:
-		paragraph("好感 +%d    灵感 +1    本回合开发效率 %d%%\n%s" % [int(report.affinity), int(report.efficiency * 100), "发布前最后一次检查完成。看看我们的作品吧。" if month == 12 else advice()], Rect2(394, 483, 648, 100), 18, MUTED, layer)
-	label_at("本次获得灵感  +%d" % (1 + int(report.bonus_inspiration)), Rect2(394, 619, 650, 35), 20, TEAL, true, layer)
+		paragraph("好感 +%d    灵感 +1\n%s" % [int(report.affinity), "发布前最后一次检查完成。看看我们的作品吧。" if month == 12 else advice()], Rect2(394, 483, 648, 100), 18, MUTED, layer)
+	label_at("本次获得灵感  +%d" % (int(report.inspiration_delta)), Rect2(394, 619, 650, 35), 20, TEAL, true, layer)
 	button_at("前往年度游戏展  →" if month == 12 else "收起手记，进入 %02d 月  →" % (month + 1), Rect2(394, 698, 652, 55), advance_report, true, layer, 20)
 
 func advice() -> String:
-	if float(state.work.b) >= 12:
-		return "Bug 开始拖慢大家的工作。试试集中测试，或安排阿序修复。"
 	if absf(float(state.work.v) - float(state.work.m)) > 15:
 		return "视觉和听觉有些失衡，补齐较弱的一项能更快提高表现力。"
-	if int(state.inspiration) >= 6:
-		for member in state.members:
-			if int(member.affinity) >= 20 and not member.learned:
-				return "有人已经可以学习技能了。花费灵感，能让专长岗位持续增产。"
+	for member_id in 4:
+		for slot in Model.DEFINITIONS[member_id].skills:
+			if SkillRunner.status(state, member_id, slot).can_learn:
+				return "有人已经可以习得技能了。打开人物技能页查看。"
 	return "开发顺畅。培养伙伴还是打磨作品，下个月由你决定。"
 
 func advance_report() -> void:
@@ -486,15 +470,35 @@ func advance_report() -> void:
 	else:
 		show_game()
 
+func show_skills() -> void:
+	var layer := overlay(Rect2(100, 100, 1240, 774))
+	var sheet := MemberSheet.new()
+	layer.add_child(sheet)
+	sheet.position = Vector2(100, 100)
+	sheet.size = Vector2(1240, 774)
+	sheet.display_member(state, selected, Model.DEFINITIONS[selected].id)
+	sheet.learn_requested.connect(func(member_id: int, slot_index: int):
+		state = Model.learn(state, member_id, slot_index)
+		persist()
+		sheet.display_member(state, member_id, Model.DEFINITIONS[member_id].id)
+	)
+	button_at("关闭", Rect2(1200, 26, 140, 56), func(): layer.queue_free(); show_game(), true, layer)
+
+func _skill_feedback(report: Dictionary) -> String:
+	var messages: Array[String] = []
+	for event in report.get("skill_events", []):
+		var text: String = event.name + ("：" + event.quip if not event.quip.is_empty() else "")
+		if text not in messages: messages.append(text)
+	return "技能触发：" + "；".join(messages) if not messages.is_empty() else ""
 func show_help() -> void:
 	var layer := overlay(Rect2(330, 103, 780, 696))
 	label_at("把灵感，变成一款游戏", Rect2(368, 129, 700, 58), 31, INK, true, layer)
 	var help := [
 		["01  每个月选择一次行动", "先点击社员，再选邀约或任务。执行后全员自动开发，月份 +1。"],
 		["02  分工可以随时调整", "玩法产出游戏性和创新，美术与音乐共同决定表现力；修复降低 Bug。"],
-		["03  好感与技能是长期投资", "好感 20 解锁专长技能，花 6 灵感习得。学技能、换岗位不消耗月份。"],
-		["04  别让 Bug 一直堆着", "行动后 Bug 达到 12 / 24，自动开发效率降到 85% / 70%。"],
-		["05  年底带作品去参展", "第 4、8 月试玩，第 12 月评奖。最佳游戏需总分 ≥80、三项评分 ≥50、Bug ≤5。"]
+		["03  好感与技能是长期投资", "三个技能在 0/20/50 好感解锁；自动或付费习得，费用由技能配置。学习不消耗月份。"],
+		["04  Bug 暂为记录数值", "Bug 可增加或修复，暂不影响开发、奖励、评分或奖项。"],
+		["05  年底带作品去参展", "第 4、8 月试玩，第 12 月评奖。最佳游戏需总分 ≥80、三项评分 ≥50。"]
 	]
 	for i in range(help.size()):
 		label_at(help[i][0], Rect2(368, 213 + i * 90, 700, 32), 20, TEAL, true, layer)
@@ -503,7 +507,7 @@ func show_help() -> void:
 
 func show_ending() -> void:
 	clear_page()
-	var result: Dictionary = Model.score(state.work)
+	var result: Dictionary = state.report.score
 	panel(Rect2(0, 0, 510, 900), INK, 0)
 	label_at("YEAR ONE  /  SHOWCASE", Rect2(47, 43, 420, 35), 16, Color("b5ccbe"), true)
 	label_at("我们的第一款游戏", Rect2(47, 126, 424, 50), 28, PAPER, true)
@@ -522,12 +526,12 @@ func show_ending() -> void:
 		meter(Rect2(718, y + 10, 478, 14), values[i] / 100.0, [TEAL, Color("ae8542"), Color("8876a0")][i])
 		label_at("%.1f 分" % values[i], Rect2(1220, y - 3, 160, 39), 23, TEAL, true)
 	panel(Rect2(560, 374, 817, 88), PAPER)
-	label_at("Bug %.1f   →   扣除 %.1f 分" % [state.work.b, result.penalty], Rect2(580, 388, 767, 30), 19, RED, true)
-	label_at("总分 = 游戏性 ×40% + 创新性 ×30% + 表现力 ×30% − Bug 扣分", Rect2(580, 426, 767, 22), 15, MUTED)
-	label_at("最佳游戏奖的三个条件", Rect2(563, 489, 780, 34), 20, INK, true)
-	var checks := [float(result.total) >= 80, minf(result.g, minf(result.i, result.p)) >= 50, float(state.work.b) <= 5]
-	var check_names := ["总分 ≥ 80", "三项评分均 ≥ 50", "Bug ≤ 5"]
-	for i in range(3):
+	label_at("Bug %.1f · 暂为记录数值" % state.work.b, Rect2(580, 388, 767, 30), 19, RED, true)
+	label_at("总分 = 游戏性 ×40% + 创新性 ×30% + 表现力 ×30%", Rect2(580, 426, 767, 22), 15, MUTED)
+	label_at("最佳游戏奖的两个条件", Rect2(563, 489, 780, 34), 20, INK, true)
+	var checks := [float(result.total) >= 80, minf(result.g, minf(result.i, result.p)) >= 50]
+	var check_names := ["总分 ≥ 80", "三项评分均 ≥ 50"]
+	for i in checks.size():
 		panel(Rect2(560 + i * 279, 539, 260, 51), CREAM)
 		label_at(("已达成  " if checks[i] else "还差一点  ") + check_names[i], Rect2(574 + i * 279, 547, 235, 35), 16, TEAL if checks[i] else RED, true)
 	label_at("一年后的伙伴们", Rect2(562, 624, 780, 32), 20, INK, true)
@@ -535,7 +539,7 @@ func show_ending() -> void:
 		var x := 560.0 + id * 206
 		portrait_at(id, Rect2(x, 678, 57, 57))
 		label_at(Model.DEFINITIONS[id].name, Rect2(x + 69, 675, 127, 27), 18, INK, true)
-		label_at("好感 %d%s" % [int(state.members[id].affinity), " · 技能✓" if state.members[id].learned else ""], Rect2(x + 69, 710, 134, 26), 14, MUTED)
+		label_at("好感 %d%s" % [int(state.members[id].affinity), " · 技能✓" if not state.members[id].learned_skills.is_empty() else ""], Rect2(x + 69, 710, 134, 26), 14, MUTED)
 	button_at("换一种策略，再来一年  →", Rect2(560, 797, 523, 59), func(): return_to_game = false; show_setup(), true, null, 21)
 	button_at("查看制作手记", Rect2(1102, 797, 275, 59), show_history, false, null, 19)
 
@@ -579,10 +583,8 @@ func _run_ui_smoke() -> void:
 		return
 	await ui_click(Vector2(712, 740))
 	for month in range(1, 13):
-		selected = 0 if float(state.work.b) >= 10 else 1
-		action = 5 if float(state.work.b) >= 10 else (0 if month <= 5 else 2)
-		if int(state.members[1].affinity) >= 20 and not state.members[1].learned:
-			state = Model.learn(state, 1)
+		selected = 1
+		action = 0 if month <= 5 else 2
 		show_game()
 		# Exercise the real UI signal, controller, report, and transition path.
 		commit_button.pressed.emit()

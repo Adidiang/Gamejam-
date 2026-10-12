@@ -1,0 +1,126 @@
+{
+  "initial_members": [
+    "a",
+    "b",
+    "c",
+    "d"
+  ],
+  "characters": [
+    {
+      "id": "a",
+      "name": "代号sheep",
+      "attributes": {
+        "programming": 10,
+        "imagination": 100,
+        "art": 20,
+        "music": 10
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "奇幻、科幻",
+      "skills": [
+        {
+          "skill_id": "a_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "a_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "a_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "res://assets/portraits/a.png"
+    },
+    {
+      "id": "b",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "b_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "b_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "b_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "res://assets/portraits/b.png"
+    },
+    {
+      "id": "c",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "c_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "c_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "c_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "res://assets/portraits/c.png"
+    },
+    {
+      "id": "d",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "d_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "d_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "d_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": ""
+    }
+  ]
+}

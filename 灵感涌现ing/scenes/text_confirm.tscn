@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://bq1xk8rdn4vtm"]
+
+[ext_resource type="Script" path="res://scripts/text_confirm.gd" id="1_text_confirm"]
+
+[node name="TextConfirm" type="CanvasLayer"]
+process_mode = 3
+layer = 100
+script = ExtResource("1_text_confirm")
