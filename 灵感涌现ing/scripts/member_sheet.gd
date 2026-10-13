@@ -213,7 +213,7 @@ func display_member(state: Dictionary, member_id: int, character_id: String) -> 
 	portrait_view.texture = CharacterTable.portrait_texture(definition.portrait)
 	portrait_placeholder.visible = portrait_view.texture == null
 	modifiers_label.text = "其他修正：" + _filled(definition.other_modifiers)
-	var base_values := Model.base_ability(member_id)
+	var base_values := Model.base_ability(member_id, state)
 	var final_values := Model.ability(state, member_id)
 	for index in stat_base_values.size():
 		stat_base_values[index].text = String.num(float(base_values[index]), 1)

@@ -4,6 +4,7 @@ extends SceneTree
 ## 并且排期按钮保持可点击。
 
 const Model = preload("res://scripts/game_model.gd")
+const SkillFixture = preload("res://tests/fixtures/skill_fixture.gd")
 var checks := 0
 var failures := 0
 var scene
@@ -18,6 +19,7 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
+	var skill_definitions := SkillFixture.without_effects()
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
@@ -120,6 +122,7 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 	Model.DEFINITIONS = definitions
+	SkillFixture.restore(skill_definitions)
 	print("Main screen HUD: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 

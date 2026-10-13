@@ -33,6 +33,7 @@ func matches(conditions: Dictionary) -> bool:
 		match key:
 			"owner_role": actual = state.members[member_index(owner_id)].role
 			"actor_is_owner": actual = values.get("actor_id", "") == owner_id
+			"owner_slept": actual = owner_id in values.get("sleeping_member_ids", [])
 			"year", "month": actual = state[key]
 			_: actual = values.get(key)
 		if actual != conditions[key]:

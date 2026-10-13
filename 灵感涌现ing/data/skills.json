@@ -3,29 +3,115 @@
     {
       "id": "a_skill_1",
       "name": "白日梦",
-      "description": "",
-      "quip": "",
+      "description": "自己工作或执行任务时有50%概率睡着，取消本次产出。任务仍消耗行动步数，但保留年度任务次数。",
+      "quip": "我再确认一遍，她只是连睡了一个星期而不是死了对吧？",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [
+        {
+          "hook": "ACTION_BEFORE",
+          "conditions": {
+            "action_kind": "task",
+            "actor_is_owner": true
+          },
+          "target": "owner",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "sleep",
+            "probability": 0.5
+          },
+          "priority": 0
+        },
+        {
+          "hook": "DUTY_BEFORE",
+          "conditions": {},
+          "target": "owner",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "sleep",
+            "probability": 0.5
+          },
+          "priority": 0
+        }
+      ]
     },
     {
       "id": "a_skill_2",
       "name": "梦境讲述",
-      "description": "",
+      "description": "每次睡着，自己的脑洞白值+10，其余当前社员脑洞白值+5。本局内保留成长。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [
+        {
+          "hook": "ACTION_AFTER",
+          "conditions": {
+            "owner_slept": true
+          },
+          "target": "team",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "growth",
+            "owner_gain": 10,
+            "others_gain": 5
+          },
+          "priority": 0
+        },
+        {
+          "hook": "DUTY_AFTER",
+          "conditions": {
+            "owner_slept": true
+          },
+          "target": "team",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "growth",
+            "owner_gain": 10,
+            "others_gain": 5
+          },
+          "priority": 0
+        }
+      ]
     },
     {
       "id": "a_skill_3",
       "name": "梦想家",
-      "description": "",
+      "description": "每次睡着后，当前作品任意社员的下一次成功任务产出翻倍，只影响作品属性和灵感。标记不叠加，跨年清除。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 20,
+      "triggers": [
+        {
+          "hook": "ACTION_AFTER",
+          "conditions": {
+            "owner_slept": true
+          },
+          "target": "work",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "dreamer"
+          },
+          "priority": 0
+        },
+        {
+          "hook": "DUTY_AFTER",
+          "conditions": {
+            "owner_slept": true
+          },
+          "target": "work",
+          "frequency": "event",
+          "effect_id": "sheep_skill",
+          "params": {
+            "mode": "dreamer"
+          },
+          "priority": 0
+        }
+      ]
     },
     {
       "id": "b_skill_1",

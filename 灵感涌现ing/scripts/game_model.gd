@@ -23,7 +23,7 @@ static var DEFINITIONS: Array = CharacterTable.definitions()
 static func fresh() -> Dictionary:
 	var members: Array = []
 	for id in DEFINITIONS.size():
-		members.append({"id": DEFINITIONS[id].id, "affinity": DEFINITIONS[id].affinity, "role": [0, 0, 1, 2][id], "learned_skills": []})
+		members.append({"id": DEFINITIONS[id].id, "affinity": DEFINITIONS[id].affinity, "role": [0, 0, 1, 2][id], "learned_skills": [], "ability_growth": [0.0, 0.0, 0.0, 0.0]})
 	return {"version": VERSION, "phase": "setup", "year": 1, "month": 1, "inspiration": INSPIRATION.initial, "action_steps": 1,
 		"run_id": "%.6f:%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()],
 		"skill_runtime": {"events": {}, "counts": {}, "temporary": []}, "skill_log": [],
@@ -91,11 +91,12 @@ static func select_project(state: Dictionary, title: String, genre_id: String, t
 	return {"ok": true, "state": next, "project": profile.duplicate(true)}
 
 ## 白值：人物表基础属性，加上直接增加的数值。
-## 后续技能或“其他修正”里的直接加值都汇总在这里，不再参与百分比计算。
-static func base_ability(id: int) -> Array:
+## 直接成长先并入白值，再由 ability() 统一应用一次百分比增幅。
+static func base_ability(id: int, state: Dictionary = {}) -> Array:
 	var result: Array = []
-	for value in DEFINITIONS[id].stats:
-		result.append(float(value))
+	var growth: Array = state.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0]) if state.has("members") else [0.0, 0.0, 0.0, 0.0]
+	for index in DEFINITIONS[id].stats.size():
+		result.append(float(DEFINITIONS[id].stats[index]) + float(growth[index]))
 	return result
 
 ## 百分比增幅合计：目前只有好感增幅。
@@ -107,7 +108,7 @@ static func ability_bonus(state: Dictionary, id: int) -> float:
 static func ability(state: Dictionary, id: int) -> Array:
 	var factor: float = 1.0 + ability_bonus(state, id)
 	var result: Array = []
-	for value in base_ability(id):
+	for value in base_ability(id, state):
 		result.append(value * factor)
 	return result
 
@@ -199,6 +200,8 @@ static func resolve(state: Dictionary, id: int, action: int, expected_month: int
 	_apply_plan(next, stage.plan)
 	records.append_array(stage.records)
 	metadata.action_result = stage.plan.duplicate(true)
+	metadata.sleeping_member_ids = stage.sleeping
+	metadata.task_multiplier = stage.task_multiplier
 	stage = SkillRunner.run(next, DEFINITIONS, "ACTION_AFTER", metadata, _plan(next))
 	_apply_plan(next, stage.plan)
 	records.append_array(stage.records)
@@ -263,11 +266,13 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	var report := {"year": expected_year, "month": expected_month,
 		"inspiration_delta": int(next.inspiration) - old_inspiration, "inspiration": next.inspiration,
 		"contributions": duties.contributions, "efficiency": duties.efficiency,
-		"members": next.members.duplicate(true), "work": next.work.duplicate(true),
+		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "work": next.work.duplicate(true),
+		"sleeping_member_ids": duties.sleeping, "skill_events": duties.records,
 		"project": project_for_year(state)}
 	next.skill_log = duties.records
 	next.month = 1 if expected_month == 12 else expected_month + 1
 	next.year = expected_year + 1 if expected_month == 12 else expected_year
+	SkillRunner.clear_expired_project_effect(next)
 	next.action_steps = 1
 	return {"ok": true, "state": next, "report": report}
 
@@ -323,9 +328,11 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 	var before := SkillRunner.run(next, DEFINITIONS, "ACTION_BEFORE", metadata, plan)
 	_apply_plan(next, before.plan)
 	metadata.action_result = before.plan.duplicate(true)
+	metadata.sleeping_member_ids = before.sleeping
+	metadata.task_multiplier = before.task_multiplier
 	var after := SkillRunner.run(next, DEFINITIONS, "ACTION_AFTER", metadata, _plan(next))
 	_apply_plan(next, after.plan)
-	if metadata.action_kind == "task":
+	if metadata.action_kind == "task" and DEFINITIONS[member_id].id not in before.sleeping:
 		if not next.has("completed_tasks"):
 			next.completed_tasks = {}
 		var year_key := str(int(state.year))
@@ -341,7 +348,8 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 		"name": action_name, "year": int(state.year), "month": int(state.month), "project": project_for_year(state),
 		"task_delta": delta, "delta": delta,
 		"inspiration_delta": int(next.inspiration) - old_inspiration, "inspiration": next.inspiration,
-		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "skill_events": records}}
+		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "skill_events": records,
+		"sleeping_member_ids": before.sleeping, "task_multiplier": before.task_multiplier}}
 
 static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictionary:
 	var records: Array = []
@@ -361,16 +369,18 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 			3: contribution.repair = 1.5 * stats[0]
 		duty_plan.contributions[DEFINITIONS[member_id].id] = contribution
 	var stage := SkillRunner.run(state, DEFINITIONS, "DUTY_BEFORE", metadata, duty_plan)
+	var sleeping: Array = stage.sleeping
 	var contributions: Array = []
 	for member in state.members:
 		contributions.append(stage.plan.contributions[member.id].duplicate(true))
 	_apply_plan(state, stage.plan)
 	records.append_array(stage.records)
 	metadata.duty_result = stage.plan.duplicate(true)
+	metadata.sleeping_member_ids = sleeping
 	stage = SkillRunner.run(state, DEFINITIONS, "DUTY_AFTER", metadata, _plan(state))
 	_apply_plan(state, stage.plan)
 	records.append_array(stage.records)
-	return {"efficiency": rate, "contributions": contributions, "records": records}
+	return {"efficiency": rate, "contributions": contributions, "records": records, "sleeping": sleeping}
 
 static func _plan(state: Dictionary) -> Dictionary:
 	var affinity: Dictionary = {}
@@ -468,6 +478,10 @@ static func valid_state(value: Variant) -> bool:
 			return false
 		if member.get("id", "") != DEFINITIONS[member_id].id:
 			return false
+		if member.has("ability_growth"):
+			if not member.ability_growth is Array or member.ability_growth.size() != 4: return false
+			for amount in member.ability_growth:
+				if not _finite_range(amount, 0, 100000): return false
 		if not _finite_range(member.affinity, 0, AFFINITY_MAX) or not _finite_range(member.role, 0, 3) or not member.learned_skills is Array:
 			return false
 		var known: Array = DEFINITIONS[member_id].skills.map(func(slot: Dictionary): return slot.skill_id)

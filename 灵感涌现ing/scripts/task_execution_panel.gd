@@ -104,8 +104,13 @@ func _show_results() -> void:
 	playing = false
 	var invited: bool = report.get("kind", "task") == "invite"
 	var lines: Array[String] = ["邀约结果" if invited else "任务产出"]
-	if not invited:
+	var asleep: bool = Model.DEFINITIONS[int(report.member)].id in report.get("sleeping_member_ids", [])
+	if asleep:
+		lines.append("睡着了…\n本次任务没有产出；行动步数已消耗，年度任务次数保留。")
+	elif not invited:
 		lines.append("表现力 %+.1f\n创新性 %+.1f" % [report.task_delta.p, report.task_delta.i])
+	if float(report.get("task_multiplier", 1.0)) > 1.0:
+		lines.append("梦想家：本次任务产出翻倍，标记已消耗。")
 	var keys := ["g", "i", "p", "v", "m", "b"] if invited else ["g", "v", "m", "b"]
 	var names := ["游戏性", "创新性", "表现力", "视觉", "听觉", "Bug"] if invited else ["游戏性", "视觉", "听觉", "Bug"]
 	for index in keys.size():
@@ -114,11 +119,18 @@ func _show_results() -> void:
 	if int(report.inspiration_delta) != 0:
 		lines.append("灵感 %+d" % report.inspiration_delta)
 	for id in report.members.size():
+		var before_growth: Array = report.members_before[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
+		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
+		var imagination_gain := float(after_growth[1]) - float(before_growth[1])
+		if not is_zero_approx(imagination_gain):
+			lines.append("%s 脑洞白值 %+.1f" % [report.members[id].id, imagination_gain])
 		var gain := int(report.members[id].affinity) - int(report.members_before[id].affinity)
 		if gain != 0 or (invited and id == int(report.member)):
 			lines.append("%s 好感度 %+d" % [report.members[id].id, gain])
 	for record in report.skill_events:
 		lines.append("%s · %s%s" % [record.owner_id, record.name, " · " + record.quip if not record.quip.is_empty() else ""])
+		for outcome in record.get("outcomes", []):
+			if outcome.kind == "arm_task_double": lines.append("当前作品的下一次任务产出翻倍。")
 	results_label.text = "\n".join(lines)
 	finish_button.disabled = false
 	finish_button.grab_focus()

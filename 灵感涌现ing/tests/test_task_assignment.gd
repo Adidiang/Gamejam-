@@ -1,5 +1,6 @@
 extends SceneTree
 const Model = preload("res://scripts/game_model.gd")
+const SkillFixture = preload("res://tests/fixtures/skill_fixture.gd")
 const SkillTable = preload("res://scripts/skills/skill_table.gd")
 const SkillDefinition = preload("res://scripts/skills/skill_definition.gd")
 var checks := 0
@@ -15,6 +16,7 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
+	var skill_definitions := SkillFixture.without_effects()
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
@@ -200,6 +202,7 @@ func _run() -> void:
 	check(scene.work_panel.report.work.has("p"), "下一回合职责结算保留任务表现力")
 	scene.queue_free()
 	await process_frame
+	SkillFixture.restore(skill_definitions)
 	print("Task assignment: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 

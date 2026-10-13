@@ -155,6 +155,15 @@ func _play_member(id: int) -> void:
 
 func _show_values(fraction: float, id: int) -> void:
 	var contribution: Dictionary = report.contributions[id]
+	if Model.DEFINITIONS[id].id in report.get("sleeping_member_ids", []):
+		var messages: Array[String] = ["睡着了…", "本月职责产出为0。"]
+		for record in report.get("skill_events", []):
+			if record.owner_id == Model.DEFINITIONS[id].id:
+				messages.append(record.name + (" · " + record.quip if not record.quip.is_empty() else ""))
+				for outcome in record.get("outcomes", []):
+					if outcome.kind == "arm_task_double": messages.append("当前作品的下一次任务产出翻倍。")
+		value_labels[id].text = "\n".join(messages)
+		return
 	var lines: Array[String] = []
 	for index in KEYS.size():
 		lines.append("%s  +%.1f" % [CAPTIONS[index], float(contribution[KEYS[index]]) * fraction])
@@ -164,6 +173,13 @@ func _finish() -> void:
 	playing = false
 	progress_label.text = "全员工作完成 · %d / %d" % [cards.size(), cards.size()]
 	summary_label.text = "作品累计：游戏性 %.1f · 创新性 %.1f · 表现力 %.1f\n视觉 %.1f · 听觉 %.1f · Bug %.1f · 本轮灵感 %+d · 当前灵感 %d" % [report.work.g, report.work.i, Model.performance(report.work), report.work.v, report.work.m, report.work.b, report.inspiration_delta, report.inspiration]
+	var growth_messages: Array[String] = []
+	for id in report.members.size():
+		var before_growth: Array = report.get("members_before", report.members)[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
+		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
+		var gain := float(after_growth[1]) - float(before_growth[1])
+		if not is_zero_approx(gain): growth_messages.append("%s 脑洞白值 %+.1f" % [report.members[id].id, gain])
+	if not growth_messages.is_empty(): summary_label.text += "\n" + " · ".join(growth_messages)
 	finish_button.disabled = false
 	finish_button.grab_focus()
 

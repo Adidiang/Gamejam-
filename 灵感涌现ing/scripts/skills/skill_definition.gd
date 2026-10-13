@@ -43,7 +43,7 @@ static func validate(row: Variant) -> String:
 						return "条件 %s 必须为整数。" % key
 					var limits: Array = {"owner_role": [0, 3], "action_id": [0, 5], "month": [1, 12], "year": [1, 3]}[key]
 					if value < limits[0] or value > limits[1]: return "条件 %s 超出允许范围。" % key
-				"actor_is_owner", "award_best":
+				"actor_is_owner", "award_best", "owner_slept":
 					if not trigger.conditions[key] is bool: return "%s 必须为布尔值。" % key
 				"genre", "topic":
 					if not trigger.conditions[key] is String: return "类型与题材条件必须为文本。"
