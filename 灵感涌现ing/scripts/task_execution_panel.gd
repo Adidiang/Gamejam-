@@ -107,12 +107,11 @@ func _show_results() -> void:
 	var asleep: bool = Model.DEFINITIONS[int(report.member)].id in report.get("sleeping_member_ids", [])
 	if asleep:
 		lines.append("睡着了…\n本次任务没有产出；行动步数已消耗，年度任务次数保留。")
-	elif not invited:
-		lines.append("表现力 %+.1f\n创新性 %+.1f" % [report.task_delta.p, report.task_delta.i])
 	if float(report.get("task_multiplier", 1.0)) > 1.0:
 		lines.append("梦想家：本次任务产出翻倍，标记已消耗。")
-	var keys := ["g", "i", "p", "v", "m", "b"] if invited else ["g", "v", "m", "b"]
-	var names := ["游戏性", "创新性", "表现力", "视觉", "听觉", "Bug"] if invited else ["游戏性", "视觉", "听觉", "Bug"]
+## 任务产出只列作品属性；邀约不产出作品属性。
+	var keys: Array = [] if invited or asleep else ["p", "i", "g", "b"]
+	var names: Array = [] if invited or asleep else ["表现力", "创新性", "游戏性", "Bug"]
 	for index in keys.size():
 		if not is_zero_approx(float(report.task_delta[keys[index]])):
 			lines.append("%s %+.1f" % [names[index], report.task_delta[keys[index]]])
@@ -128,7 +127,8 @@ func _show_results() -> void:
 		if gain != 0 or (invited and id == int(report.member)):
 			lines.append("%s 好感度 %+d" % [report.members[id].id, gain])
 	for record in report.skill_events:
-		lines.append("%s · %s%s" % [record.owner_id, record.name, " · " + record.quip if not record.quip.is_empty() else ""])
+		## 只显示技能名；吐槽统一只在人物页的技能介绍里出现。
+		lines.append("%s · %s" % [record.owner_id, record.name])
 		for outcome in record.get("outcomes", []):
 			if outcome.kind == "arm_task_double": lines.append("当前作品的下一次任务产出翻倍。")
 	results_label.text = "\n".join(lines)

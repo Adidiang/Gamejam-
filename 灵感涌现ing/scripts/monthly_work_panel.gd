@@ -10,8 +10,8 @@ const PAPER := Color("fffdf7")
 const INK := Color("203e42")
 const TEAL := Color("2a6965")
 const GOLD := Color("efc56c")
-const KEYS := ["g", "i", "v", "m", "b", "repair"]
-const CAPTIONS := ["游戏性", "创新性", "视觉", "听觉", "新增 Bug", "修复能力"]
+const KEYS := ["g", "i", "p", "b", "repair"]
+const CAPTIONS := ["游戏性", "创新性", "表现力", "Bug", "修复能力"]
 
 var title_label: Label
 var progress_label: Label
@@ -159,7 +159,8 @@ func _show_values(fraction: float, id: int) -> void:
 		var messages: Array[String] = ["睡着了…", "本月职责产出为0。"]
 		for record in report.get("skill_events", []):
 			if record.owner_id == Model.DEFINITIONS[id].id:
-				messages.append(record.name + (" · " + record.quip if not record.quip.is_empty() else ""))
+				## 只显示技能名；吐槽只在人物页的技能介绍里出现。
+				messages.append(record.name)
 				for outcome in record.get("outcomes", []):
 					if outcome.kind == "arm_task_double": messages.append("当前作品的下一次任务产出翻倍。")
 		value_labels[id].text = "\n".join(messages)
@@ -167,12 +168,32 @@ func _show_values(fraction: float, id: int) -> void:
 	var lines: Array[String] = []
 	for index in KEYS.size():
 		lines.append("%s  +%.1f" % [CAPTIONS[index], float(contribution[KEYS[index]]) * fraction])
-	value_labels[id].text = "   ·   ".join(lines.slice(0, 2)) + "\n" + "   ·   ".join(lines.slice(2, 4)) + "\n" + "   ·   ".join(lines.slice(4, 6))
+	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3, 5))
+
+## 底部汇总只看本回合全员岗位产出的合计，不显示作品累计（累计值在主界面属性栏）。
+func _month_summary_text() -> String:
+	var totals := _month_totals()
+	var lines: Array[String] = []
+	for index in KEYS.size():
+		lines.append("%s %+.1f" % [CAPTIONS[index], float(totals[KEYS[index]])])
+	var head := "本月总计：" + "   ·   ".join(lines.slice(0, 3))
+	var tail := "   ·   ".join(lines.slice(3, 5))
+	return "%s\n%s   ·   本轮灵感 %+d   ·   当前灵感 %d" % [head, tail, report.inspiration_delta, report.inspiration]
+
+## 本回合全体成员的岗位产出逐项相加；修复能力沿用卡片的原始贡献口径。
+func _month_totals() -> Dictionary:
+	var totals: Dictionary = {}
+	for key in KEYS:
+		totals[key] = 0.0
+	for contribution in report.contributions:
+		for key in KEYS:
+			totals[key] = float(totals[key]) + float(contribution.get(key, 0.0))
+	return totals
 
 func _finish() -> void:
 	playing = false
 	progress_label.text = "全员工作完成 · %d / %d" % [cards.size(), cards.size()]
-	summary_label.text = "作品累计：游戏性 %.1f · 创新性 %.1f · 表现力 %.1f\n视觉 %.1f · 听觉 %.1f · Bug %.1f · 本轮灵感 %+d · 当前灵感 %d" % [report.work.g, report.work.i, Model.performance(report.work), report.work.v, report.work.m, report.work.b, report.inspiration_delta, report.inspiration]
+	summary_label.text = _month_summary_text()
 	var growth_messages: Array[String] = []
 	for id in report.members.size():
 		var before_growth: Array = report.get("members_before", report.members)[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])

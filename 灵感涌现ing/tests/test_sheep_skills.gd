@@ -33,7 +33,7 @@ func probability(chance: float) -> void:
 	Skills.skills[row.id] = Definition.from_row(row)
 
 func ready(learned: bool = true) -> Dictionary:
-	var state: Dictionary = Model.select_project(Model.fresh_annual(), "梦境测试", "rpg", "fantasy", 1).state
+	var state: Dictionary = Model.select_project(Model.fresh(), "梦境测试", "rpg", "fantasy", 1).state
 	if learned:
 		state.members[0].affinity = 50
 		state.inspiration = 100
@@ -166,7 +166,9 @@ func _run() -> void:
 	var loaded := Store.load_run("res://qa/sheep_save.json")
 	check(not loaded.is_empty() and same_json(loaded.skill_runtime.next_task_double, pending), "Pending flag survives save/load")
 	check(near(Model.base_ability(0, loaded)[1], 110), "Permanent local growth survives save/load")
-	check(same_json(Model.execute_task(loaded, 1, "art_concept", 1, 2), all_outputs), "Reload does not change task double result")
+	var reloaded := Model.execute_task(loaded, 1, "art_concept", 1, 2)
+	## 读档后浮点末位可能有一格误差，比较语义值与技能运行记录即可。
+	check(reloaded.ok and near(reloaded.report.task_delta.p, all_outputs.report.task_delta.p) and near(reloaded.report.task_delta.i, all_outputs.report.task_delta.i) and reloaded.report.task_multiplier == all_outputs.report.task_multiplier and same_json(reloaded.state.skill_runtime, all_outputs.state.skill_runtime), "Reload does not change task double result")
 	var december: Dictionary = sleep_work.state.duplicate(true)
 	december.month = 12
 	var new_year := Model.advance_work(december, 1, 12)

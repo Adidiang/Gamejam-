@@ -19,7 +19,7 @@ func _initialize() -> void:
 func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
-	var initial := Model.fresh_annual()
+	var initial := Model.fresh()
 	check(Model.valid_state(initial) and Model.needs_project_selection(initial), "年初待选择状态可存档")
 	check(not Model.advance_work(initial, 1, 1).ok and Model.available_tasks(initial).is_empty() and not Model.execute_invite(initial, 0, 1, 1).ok, "未选择作品时拒绝工作和行动")
 	for bad in [["  ", "act", "fantasy"], ["名字", "unknown", "fantasy"], ["名字", "act", "unknown"], ["多\n行", "act", "fantasy"]]:
@@ -56,11 +56,12 @@ func _run() -> void:
 	check(result.ok and result.report.project.title == long_title and Model.needs_project_selection(result.state), "十二月报告保留旧作品，次年待选择")
 	state = result.state
 	check(Model.valid_state(state), "跨年等待选择也能存档")
-	check(not Model.resolve(state, 0, 0, 1).ok, "旧原型整月行动入口不能绕过年初选择")
 	result = Model.select_project(state, "次年游戏", "rpg", "historical", 2)
 	state = result.state
 	check(Model.project_for_year(state, 1).title == long_title and Model.project_for_year(state).title == "次年游戏", "两年作品档案独立保留")
-	check(state.work.g >= 42.0 and state.members[0].affinity == 20, "选择不擅自清空产出或改变好感规则")
+	var finished: Dictionary = Model.annual_result_for_year(state, 1)
+	check(finished.work.g >= 42.0 and finished.project.title == long_title, "跨年后第一年作品与产出归档到年度评奖记录")
+	check(state.work.g == 0.0 and state.members[0].affinity == 20, "新作品产出从零开始，好感与档案保留")
 	check(Store.save_run(state, "res://qa/annual_project.json") == OK, "多年度档案保存")
 	loaded = Store.load_run("res://qa/annual_project.json")
 	check(Model.valid_state(loaded) and loaded.annual_projects == JSON.parse_string(JSON.stringify(state.annual_projects)), "多年度档案恢复")
@@ -83,9 +84,9 @@ func _run() -> void:
 	check(SkillDefinition.validate(skill_row).is_empty(), "技能配置接受稳定的类型题材 ID")
 	var original_skill = SkillTable.skills[skill_id]
 	SkillTable.skills[skill_id] = SkillDefinition.from_row(skill_row)
-	var matching: Dictionary = Model.select_project(Model.fresh_annual(), "条件测试", "narrative", "sci_fi", 1).state
+	var matching: Dictionary = Model.select_project(Model.fresh(), "条件测试", "narrative", "sci_fi", 1).state
 	check(matching.inspiration == 5 and not matching.skill_log.is_empty(), "立项技能实际按类型题材 ID 触发")
-	var not_matching: Dictionary = Model.select_project(Model.fresh_annual(), "条件测试", "narrative", "fantasy", 1).state
+	var not_matching: Dictionary = Model.select_project(Model.fresh(), "条件测试", "narrative", "fantasy", 1).state
 	check(not_matching.inspiration == 2, "不匹配题材时不触发立项技能")
 	check(not Model.select_project(matching, "重复确认", "narrative", "sci_fi", 1).ok and matching.inspiration == 5, "重复确认不能重复发放立项技能收益")
 	matching.month = 12
@@ -97,8 +98,7 @@ func _run() -> void:
 	check(not SkillDefinition.validate(skill_row).is_empty(), "技能配置中的非法类型 ID 被拒绝")
 	for genre in Catalog.GENRES:
 		for topic in Catalog.TOPICS:
-			check(Model.select_project(Model.fresh_annual(), "组合", genre.id, topic.id, 1).ok, "6×5 种组合全部有效")
-	check(Model.valid_state(Model.begin(Model.fresh(), "旧原型", 0, 0)), "旧原型的版本 4 存档兼容")
+			check(Model.select_project(Model.fresh(), "组合", genre.id, topic.id, 1).ok, "6×5 种组合全部有效")
 	var scene = load("res://scenes/interface_shell.tscn").instantiate()
 	root.add_child(scene)
 	for frame in 4:
@@ -117,6 +117,12 @@ func _run() -> void:
 	screen.genre_buttons[5].pressed.emit()
 	check(screen.genre_buttons[5].button_pressed and not screen.genre_buttons[0].button_pressed, "类型只能单选且可切换")
 	check(not screen.confirm_button.disabled and screen.preview_label.text.contains("剧情向") and screen.preview_label.text.contains("惊悚"), "预览实时刷新并允许确认")
+	## 立项好感预览：人物 a 的题材偏好为“奇幻、科幻”，b／c／d 未填写偏好。
+	screen.topic_buttons[0].pressed.emit()
+	check(screen.affinity_label.text.contains(Model.DEFINITIONS[0].name) and screen.affinity_label.text.contains("+%d" % Model.PREFERENCE_AFFINITY), "选择命中偏好的题材时实时显示加好感的成员与增量")
+	check(screen.affinity_label.text.contains("题材") and not screen.affinity_label.text.contains(Model.DEFINITIONS[1].name), "只列出命中偏好的成员并说明命中来源")
+	screen.topic_buttons[4].pressed.emit()
+	check(screen.affinity_label.text.contains("没有成员命中"), "未命中偏好时明确提示无人加好感")
 	for resolution in [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(900, 700)]:
 		root.size = resolution
 		for frame in 5:
@@ -148,11 +154,28 @@ func _run() -> void:
 		await process_frame
 	scene.work_panel.finish_button.pressed.emit()
 	await process_frame
-	check(screen.visible and not scene.main_screen.visible and screen.selection_year == 2, "工作确认后自动进入次年选择界面")
+	var award = scene.award_screen
+	check(award.visible and not screen.visible and award.step_title.text == "本年度未获奖" and award.step_body.text.is_empty(), "工作确认后进入评奖界面，未获奖不显示灵感")
+	check(Model.annual_result_for_year(scene.state, 1).project.title == "UI 测试游戏", "评奖结果写入年度档案")
+	check(award.steps.size() == 1 and award.continue_button.text == "进入下一年", "未获奖只有一页评奖界面")
+	## 把人物 a 顶到上限，验证次年选择页按上限显示真实增量。
+	scene.state.members[0].affinity = Model.AFFINITY_MAX
+	award.continue_button.pressed.emit()
+	await process_frame
+	check(not award.visible and screen.visible and not scene.main_screen.visible and screen.selection_year == 2, "评奖结束后自动进入次年选择界面")
 	check(screen.title_input.text.is_empty() and screen.genre_id.is_empty() and screen.topic_id.is_empty() and screen.confirm_button.disabled, "次年草稿清空，不沿用旧作品资料")
 	scene.open_schedule()
 	scene.open_character("a")
 	check(not scene.duty_panel.visible and not scene.character_screen.visible, "年初未确认不可绕过选择页")
+	## 满好感成员不会再加偏好好感：预览要按上限如实标注，避免“显示 +10、实际 +0”。
+	screen.topic_buttons[0].pressed.emit()
+	check(screen.affinity_label.text.contains("好感已满") and not screen.affinity_label.text.contains(Model.DEFINITIONS[0].name + " +"), "满好感成员的偏好奖励在预览中标注为已满")
+	var capped_screen = load("res://scripts/game_selection_screen.gd").new()
+	root.add_child(capped_screen)
+	capped_screen.open(2, [Model.AFFINITY_MAX - 5, 0, 0, 0])
+	capped_screen.topic_buttons[0].pressed.emit()
+	check(capped_screen.affinity_label.text.contains("+5") and capped_screen.affinity_label.text.contains("受上限 %d 限制" % Model.AFFINITY_MAX), "接近上限时预览显示上限内的真实增量")
+	capped_screen.queue_free()
 	screen.title_input.text = "第二年的游戏"
 	screen.title_input.text_changed.emit(screen.title_input.text)
 	screen.genre_buttons[2].pressed.emit()

@@ -55,8 +55,8 @@ func _run() -> void:
 	extra.name = "新人物测试"
 	extra.attributes = {"programming": 10, "imagination": 4, "art": 6, "music": 2}
 	extra.affinity = 0
-	extra.preferred_genre = "动作"
-	extra.preferred_topic = "校园"
+	extra.preferred_genre = "ACT"
+	extra.preferred_topic = "奇幻"
 	var fixture_skill = Skills.skills[extra.skills[0].skill_id].duplicate(true)
 	fixture_skill.display_name = "测试技能"
 	fixture_skill.description = "测试说明，仅用于确认人物表内容能显示。"
@@ -83,7 +83,7 @@ func _run() -> void:
 	root.add_child(sheet)
 	sheet.display_member(state, 0, extra.id)
 	check(sheet.title_label.text.contains(extra.name), "Filled name appears in member page")
-	check(sheet.preference_label.text.contains("动作") and sheet.preference_label.text.contains("校园"), "Preferences appear in member page")
+	check(sheet.preference_label.text.contains("ACT") and sheet.preference_label.text.contains("奇幻"), "Preferences appear in member page")
 	check(sheet.skill_names[0].text.contains(fixture_skill.display_name), "Filled skill name appears")
 	check(sheet.skill_descriptions[0].text == fixture_skill.description, "Filled skill description appears")
 	check(sheet.modifiers_label.text.contains(extra.other_modifiers), "Other modifiers appear as description")
@@ -99,12 +99,12 @@ func _run() -> void:
 	sheet.display_member(state, 0, extra.id)
 	check(sheet.portrait_view.texture == null and sheet.portrait_placeholder.visible, "Empty portrait clears previous character texture")
 	state.members[0].affinity = 30
-	state = Model.begin(state, "偏好测试", 0, 2)
-	check(state.members[0].affinity == 42, "New preferences influence existing project selection")
+	state = Model.select_project(state, "偏好测试", "act", "fantasy", 1).state
+	check(state.members[0].affinity == mini(Table.AFFINITY_MAX, 30 + 2 * Model.PREFERENCE_AFFINITY), "Matched preferences raise affinity on project selection")
 	var capped := Model.fresh()
 	capped.members[0].affinity = Table.AFFINITY_MAX
-	capped = Model.begin(capped, "封顶测试", 0, 2)
-	check(capped.members[0].affinity == Table.AFFINITY_MAX, "Match bonus cannot exceed the affinity cap")
+	capped = Model.select_project(capped, "封顶测试", "act", "fantasy", 1).state
+	check(capped.members[0].affinity == Table.AFFINITY_MAX, "Preference bonus cannot exceed the affinity cap")
 	Table.table = original_table
 	Skills.skills = original_skills
 	Model.DEFINITIONS = original_definitions

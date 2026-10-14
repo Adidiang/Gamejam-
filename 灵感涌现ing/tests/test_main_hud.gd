@@ -29,7 +29,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	scene.state = Model.fresh()
+	scene.state = Model.select_project(Model.fresh(), "星尘回响", "narrative", "fantasy", 1).state
 	for id in 4:
 		scene.state.members[id].role = id
 	scene.show_main()
@@ -37,9 +37,9 @@ func _run() -> void:
 	check(scene.status_panel.visible, "主界面显示属性栏")
 	check(scene.gameplay_label.text == "游戏性 0.0" and scene.innovation_label.text == "创新性 0.0"
 		and scene.presentation_label.text == "表现力 0.0" and scene.bug_label.text == "Bug 0.0", "开局四项属性均为零")
-	check(scene.project_label.text == "「未命名的灵感」 · 动作 / 科幻", "旧原型状态回退显示作品名与类型题材")
+	check(scene.project_label.text == "「星尘回响」 · 剧情向 / 奇幻", "属性栏显示当年作品的名字与类型题材")
 
-	var selection := Model.select_project(Model.fresh_annual(), "星尘回响", "narrative", "fantasy", 1)
+	var selection := Model.select_project(Model.fresh(), "第二年作品", "act", "modern", 1)
 	check(selection.ok, "年度作品档案可以立项")
 	scene.state = selection.state
 	for id in 4:
@@ -47,7 +47,7 @@ func _run() -> void:
 	scene.show_main()
 	await process_frame
 	check(scene.main_screen.visible, "立项后进入主界面")
-	check(scene.project_label.text == "「星尘回响」 · 剧情向 / 奇幻", "属性栏显示当年作品的名字与类型题材")
+	check(scene.project_label.text == "「第二年作品」 · ACT / 现代", "属性栏显示当年作品的名字与类型题材")
 	check(scene.gameplay_label.text == "游戏性 0.0" and scene.bug_label.text == "Bug 0.0", "新作品的属性从零开始")
 	var status_rect: Rect2 = scene.status_panel.get_global_rect()
 	check(status_rect.size.x > 0.0 and status_rect.size.y > 0.0, "属性栏有可见尺寸")

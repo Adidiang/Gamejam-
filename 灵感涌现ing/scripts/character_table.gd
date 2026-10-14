@@ -1,5 +1,5 @@
 extends RefCounted
-## 人物表是人物资料的唯一来源；界面、初始状态和旧原型共用。
+## 人物表是人物资料的唯一来源；界面与初始状态共用。
 
 const TABLE_PATH := "res://data/characters.json"
 const ATTRIBUTE_KEYS := ["programming", "imagination", "art", "music"]

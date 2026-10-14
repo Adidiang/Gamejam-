@@ -13,6 +13,9 @@ const TaskExecution = preload("res://scripts/task_execution_panel.gd")
 const CharacterTable = preload("res://scripts/character_table.gd")
 const GameCatalog = preload("res://scripts/game_catalog.gd")
 const GameSelection = preload("res://scripts/game_selection_screen.gd")
+const AnnualAward = preload("res://scripts/annual_award_screen.gd")
+const DebugTools = preload("res://scripts/debug/debug_tools.gd")
+const DebugPanel = preload("res://scripts/debug/debug_panel.gd")
 static var CHARACTER_IDS: Array = CharacterTable.initial_ids()
 
 const PAPER := Color("fffdf7")
@@ -56,6 +59,14 @@ var task_panel: Control
 var task_execution: Control
 var invite_pending := false
 var game_selection: Control
+## 十二月结算得到的年度评奖结果；工作展示确认后交给评奖界面播放。
+var pending_annual: Dictionary = {}
+var award_screen: Control
+## 调试：面板只在 DebugTools.enabled() 时创建；满好感默认开启，随时可以在面板里关掉。
+var debug_button: Button
+var debug_panel: Control
+var debug_full_affinity := true
+var debug_affinity_backup: Array = []
 
 func _ready() -> void:
 	if CHARACTER_IDS.size() != 4 or Model.DEFINITIONS.size() != 4:
@@ -105,6 +116,11 @@ func _ready() -> void:
 	game_selection.name = "GameSelectionScreen"
 	add_child(game_selection)
 	game_selection.project_requested.connect(_select_project)
+	award_screen = AnnualAward.new()
+	award_screen.name = "AnnualAwardScreen"
+	add_child(award_screen)
+	award_screen.closed.connect(_on_award_closed)
+	_build_debug_tools()
 	start_button.pressed.connect(start_game)
 	close_button.pressed.connect(close_character)
 	for index in character_buttons.size():
@@ -132,14 +148,16 @@ func show_main() -> void:
 	character_buttons[0].grab_focus()
 
 func start_game() -> void:
-	state = Model.fresh_annual()
+	state = Model.fresh()
+	## 新的一局重新开始记录：调试满好感会在下次打开调试面板时重新套用。
+	debug_affinity_backup = []
 	open_game_selection()
 
 func open_game_selection() -> void:
 	start_screen.hide()
 	main_screen.hide()
 	character_screen.hide()
-	game_selection.open(int(state.year))
+	game_selection.open(int(state.year), state.members.map(func(member: Dictionary): return int(member.affinity)))
 
 func _select_project(title: String, genre_id: String, topic_id: String, year: int) -> void:
 	if not game_selection.visible:
@@ -151,15 +169,27 @@ func _select_project(title: String, genre_id: String, topic_id: String, year: in
 	show_main()
 
 func _on_work_closed() -> void:
+	if not pending_annual.is_empty():
+		## 年末评奖先于次年立项：播放完评奖界面后再进入下一年的选择页。
+		var annual := pending_annual
+		pending_annual = {}
+		refresh_time()
+		award_screen.open(annual)
+		return
 	if Model.needs_project_selection(state):
 		open_game_selection()
 	else:
 		schedule_button.grab_focus()
 
+func _on_award_closed() -> void:
+	## 评奖结束后再去下一年的游戏选择页；show_main 会在待选择时自动跳转。
+	refresh_time()
+	show_main()
+
 func open_character(character_id: String) -> void:
 	if Model.needs_project_selection(state):
 		return
-	if work_panel.visible or task_execution.visible or task_panel.visible or invite_pending:
+	if work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	if duty_panel.visible:
 		duty_panel.close()
@@ -173,7 +203,7 @@ func open_character(character_id: String) -> void:
 	close_button.grab_focus()
 
 func close_character() -> void:
-	if task_panel.visible or task_execution.visible or invite_pending:
+	if task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	if Model.needs_project_selection(state):
 		open_game_selection()
@@ -186,7 +216,7 @@ func close_character() -> void:
 	character_buttons[maxi(0, index)].grab_focus()
 
 func _learn_skill(member_id: int, slot_index: int) -> void:
-	if task_panel.visible or task_execution.visible or invite_pending:
+	if task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	state = Model.learn(state, member_id, slot_index)
 	refresh_time()
@@ -194,12 +224,12 @@ func _learn_skill(member_id: int, slot_index: int) -> void:
 
 func open_schedule() -> void:
 	## 打开工作分配表；界面只发出调整请求，职责是否真的改变由游戏规则决定。
-	if Model.needs_project_selection(state) or work_panel.visible or task_execution.visible or task_panel.visible or invite_pending:
+	if Model.needs_project_selection(state) or work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	duty_panel.open(state)
 
 func open_tasks() -> void:
-	if not character_screen.visible or task_execution.visible or task_panel.visible or invite_pending:
+	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
 		member_sheet.show_action_notice()
@@ -207,7 +237,7 @@ func open_tasks() -> void:
 	task_panel.open(state)
 
 func open_invite() -> void:
-	if not character_screen.visible or task_execution.visible or task_panel.visible or invite_pending:
+	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
 		member_sheet.show_action_notice()
@@ -251,12 +281,14 @@ func _confirm_task(task_id: String) -> void:
 	task_execution.open(result.report)
 
 func _next_turn() -> void:
-	if not duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or invite_pending:
+	if not duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
 		return
 	var result := Model.advance_work(state, int(state.year), int(state.month))
 	if not result.ok:
 		return
 	state = result.state
+	## 十二月结算带回年度评奖结果，等工作展示确认后再播放。
+	pending_annual = result.report.get("annual", {})
 	duty_panel.close()
 	refresh_time()
 	work_panel.open(result.report)
@@ -278,13 +310,10 @@ func refresh_status() -> void:
 	bug_label.text = "Bug %.1f" % float(work.get("b", 0.0))
 
 func _project_line() -> String:
-	## 优先读当年作品档案（名字与类型题材由游戏选择页写入）；
-	## 旧原型状态没有年度档案，回退到 title／genre／topic 字段。
+	## 作品名字与类型题材都来自当年的作品档案。
 	var profile := Model.project_for_year(state)
 	if profile.is_empty():
-		var genre: int = clampi(int(state.get("genre", 0)), 0, Model.GENRES.size() - 1)
-		var topic: int = clampi(int(state.get("topic", 0)), 0, Model.TOPICS.size() - 1)
-		return "「%s」 · %s / %s" % [_title_text(str(state.get("title", ""))), Model.GENRES[genre], Model.TOPICS[topic]]
+		return "「未命名作品」 · 未选类型 / 未选题材"
 	return "「%s」 · %s / %s" % [
 		_title_text(str(profile.get("title", ""))),
 		GameCatalog.display_name(GameCatalog.GENRES, str(profile.get("genre_id", ""))),
@@ -295,9 +324,7 @@ func _title_text(title: String) -> String:
 	return title.strip_edges() if not title.strip_edges().is_empty() else "未命名作品"
 
 func _presentation(work: Dictionary) -> float:
-	## 表现力沿用模型推导（含任务直接产出）；旧状态缺字段时只显示直接产出。
-	if not work.has("v") or not work.has("m"):
-		return float(work.get("p", 0.0))
+	## 表现力是作品属性本身，直接读模型。
 	return Model.performance(work)
 
 func _assign_role(member_id: int, role: int) -> void:
@@ -306,6 +333,112 @@ func _assign_role(member_id: int, role: int) -> void:
 
 func _on_duty_closed() -> void:
 	schedule_button.grab_focus()
+
+## ---------------- 调试 ----------------
+
+func _build_debug_tools() -> void:
+	## 调试入口只在 DebugTools.enabled() 时创建：正式版关闭总开关后，
+	## 这里不会新建按钮与面板，F8 也会被 open_debug 的同一道判断挡住。
+	if not DebugTools.enabled():
+		return
+	debug_button = Button.new()
+	debug_button.name = "DebugButton"
+	debug_button.text = "调试"
+	debug_button.tooltip_text = "开发用：改当前作品属性、在本年内跳到更晚的月份、全员满好感（F8）。"
+	debug_button.anchor_left = 0.0
+	debug_button.anchor_top = 0.0
+	debug_button.anchor_right = 0.0
+	debug_button.anchor_bottom = 0.0
+	debug_button.offset_left = 32.0
+	debug_button.offset_top = 32.0
+	debug_button.offset_right = 152.0
+	debug_button.offset_bottom = 88.0
+	_style_button(debug_button, false)
+	debug_button.pressed.connect(open_debug)
+	main_screen.add_child(debug_button)
+	debug_panel = DebugPanel.new()
+	debug_panel.name = "DebugPanel"
+	main_screen.add_child(debug_panel)
+	debug_panel.closed.connect(_on_debug_closed)
+	debug_panel.work_requested.connect(_debug_change_work)
+	debug_panel.month_requested.connect(_debug_jump_month)
+	debug_panel.affinity_requested.connect(_set_debug_affinity)
+
+func open_debug() -> void:
+	## 只有停在主界面、没有其他弹窗在进行时才能打开；面板打开期间不让玩法被改动。
+	if debug_panel == null or not main_screen.visible or _debug_open():
+		return
+	if duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or game_selection.visible or invite_pending:
+		return
+	debug_panel.open(state, debug_full_affinity)
+	_apply_debug_affinity_default()
+
+func _debug_open() -> bool:
+	return debug_panel != null and debug_panel.visible
+
+func _on_debug_closed() -> void:
+	if debug_button != null:
+		debug_button.grab_focus()
+
+func _debug_change_work(key: String, mode: String, amount: float) -> void:
+	if not _debug_open():
+		return
+	var result := DebugTools.change_work(state, key, mode, amount)
+	if result.ok:
+		state = result.state
+		refresh_time()
+	debug_panel.show_state(state, debug_full_affinity)
+	debug_panel.set_status(result.message)
+
+func _debug_jump_month(month: int) -> void:
+	if not _debug_open():
+		return
+	var result := DebugTools.jump_month(state, month)
+	if result.ok:
+		state = result.state
+		refresh_time()
+	debug_panel.show_state(state, debug_full_affinity)
+	debug_panel.set_status(result.message)
+
+func _set_debug_affinity(on: bool) -> void:
+	if not _debug_open():
+		return
+	var result := DebugTools.set_full_affinity(state, on, debug_affinity_backup)
+	if result.ok:
+		state = result.state
+		debug_affinity_backup = result.backup
+		debug_full_affinity = on
+		refresh_time()
+	debug_panel.show_state(state, debug_full_affinity)
+	debug_panel.set_status(result.message)
+
+func _apply_debug_affinity_default() -> void:
+	## 满好感默认开启：打开调试面板时把这套覆盖套到当前状态上（已经套过就不再重复），
+	## 在面板里关掉后不再自动套用。这条路径只走调试面板，普通游玩不会经过，
+	## 所以调试功能不会改变正式玩法里人物表的好感数值。
+	if not debug_full_affinity or not debug_affinity_backup.is_empty():
+		return
+	var result := DebugTools.set_full_affinity(state, true, debug_affinity_backup)
+	if not result.ok:
+		return
+	state = result.state
+	debug_affinity_backup = result.backup
+	refresh_time()
+	debug_panel.show_state(state, debug_full_affinity)
+	debug_panel.set_status(result.message)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	## F8 打开或关闭调试面板；调试关闭时 _debug_open() 与 open_debug() 都不放行。
+	if not event is InputEventKey:
+		return
+	var key := event as InputEventKey
+	if not key.pressed or key.echo or key.physical_keycode != KEY_F8:
+		return
+	if _debug_open():
+		debug_panel.close()
+	else:
+		open_debug()
+	get_viewport().set_input_as_handled()
 
 func _style_hud_panels() -> void:
 	var box := _box(PAPER, INK, 2)

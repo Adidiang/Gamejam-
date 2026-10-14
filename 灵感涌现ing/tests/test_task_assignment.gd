@@ -12,6 +12,12 @@ func check(condition: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 
+func quantized(value: float) -> float:
+	## 转换单元把产出量化到 OUTPUT_DECIMALS 位小数；断言按同一规则取值，
+	## 否则小数值（如 3.0）的量化误差会超过 is_equal_approx 的 1e-5 相对容差而偶发失败。
+	var scale := pow(10.0, float(Model.OUTPUT_DECIMALS))
+	return roundf(value * scale) / scale
+
 func _initialize() -> void:
 	_run.call_deferred()
 
@@ -21,14 +27,15 @@ func _run() -> void:
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
 	Model.DEFINITIONS[0].stats = [10, 20, 30, 40]
-	var initial := Model.fresh()
+	var initial: Dictionary = Model.select_project(Model.fresh(), "任务检查", "act", "modern", 1).state
+	var factor := Model.task_output_factor(initial, 0, "art_concept")
 	var result := Model.execute_task(initial, 0, "art_concept", 1, 1)
 	check(result.ok, "无前置任务可直接执行")
 	check(initial.month == 1 and initial.action_steps == 1 and not initial.has("completed_tasks"), "执行不修改输入状态且初始一步")
-	check(is_equal_approx(result.report.task_delta.p, 50.0), "表现力等于脑洞加美术")
-	check(is_equal_approx(result.report.task_delta.i, 50.0 * 20.0 / 30.0), "创新性使用脑洞美术比值")
+	check(is_equal_approx(result.report.task_delta.p, 50.0 * factor), "表现力等于脑洞加美术并经过转换单元")
+	check(is_equal_approx(result.report.task_delta.i, 50.0 * 20.0 / 30.0 * factor), "创新性使用脑洞美术比值")
 	check(result.state.year == 1 and result.state.month == 1 and result.state.action_steps == 0 and result.state.inspiration == 2, "任务只消费行动步数，不推进月份或获得月灵感")
-	check(result.report.delta.g == 0 and result.report.delta.v == 0 and result.report.delta.m == 0 and result.report.delta.b == 0, "任务不执行职责产出")
+	check(result.report.delta.g == 0 and result.report.delta.b == 0 and float(result.report.delta.p) > 0, "任务只产出表现力与创新性，不结算职责")
 	check(result.report.inspiration_delta == 0 and not result.report.has("contributions"), "任务报告不包含月灵感或职责贡献")
 	check(Model.available_tasks(result.state).is_empty(), "全社团本年任务只执行一次")
 	check(not Model.execute_task(result.state, 1, "art_concept", 1, 1).ok, "换人不能重复执行")
@@ -38,7 +45,7 @@ func _run() -> void:
 	check(not Model.execute_task(exhausted, 0, "art_concept", 1, 1).ok and exhausted.work.i == 0, "无步数时模型直接拒绝未做过的任务")
 	var advanced := Model.advance_work(result.state, 1, 1)
 	check(advanced.ok and advanced.state.month == 2 and advanced.state.action_steps == 1 and advanced.state.inspiration == 3, "排期推进月份、获得灵感并恢复步数")
-	check(advanced.report.contributions.size() == 4 and is_equal_approx(advanced.report.work.g, 14.0), "职责仅在排期结算一次")
+	check(advanced.report.contributions.size() == 4 and is_equal_approx(advanced.report.work.g, 17.0 * Model.duty_output_factor(result.state, 0)), "职责仅在排期结算一次")
 	check(Model.available_tasks(advanced.state).is_empty(), "步数恢复不改变年度已完成任务记录")
 	var skipped := Model.advance_work(initial, 1, 1)
 	check(skipped.ok and skipped.state.action_steps == 1, "未行动也可推进月份，步数不累计")
@@ -54,23 +61,23 @@ func _run() -> void:
 		check(not Model.valid_state(invalid), "拒绝非法回合行动步数")
 	var legacy := initial.duplicate(true)
 	legacy.erase("action_steps")
-	check(Model.valid_state(legacy) and Model.action_steps(legacy) == 1, "旧状态缺省行动步数按一步处理")
+	check(not Model.valid_state(legacy), "缺少行动步数的状态被拒绝")
 	initial.members[0].affinity = 50
 	result = Model.execute_task(initial, 0, "art_concept", 1, 1)
-	check(is_equal_approx(result.report.task_delta.p, 75.0), "任务使用好感增幅后的属性")
+	check(is_equal_approx(result.report.task_delta.p, 75.0 * factor), "任务使用好感增幅后的属性")
 	Model.DEFINITIONS[0].stats = [0, 20, 0, 0]
 	result = Model.execute_task(initial, 0, "art_concept", 1, 1)
-	check(is_equal_approx(result.report.task_delta.i, 60.0), "零美术分母取 1，系数最高为 2")
+	check(is_equal_approx(result.report.task_delta.i, 60.0 * factor), "零美术分母取 1，系数最高为 2")
 	Model.DEFINITIONS[0].stats = [0, 1, 100, 0]
 	result = Model.execute_task(initial, 0, "art_concept", 1, 1)
-	check(is_equal_approx(result.report.task_delta.i, 151.5 * 0.1), "脑洞美术比值低于 0.1 时取下限")
+	check(is_equal_approx(result.report.task_delta.i, 151.5 * 0.1 * factor), "脑洞美术比值低于 0.1 时取下限")
 	Model.DEFINITIONS[0].stats = [0, 0, 20, 0]
 	result = Model.execute_task(initial, 0, "art_concept", 1, 1)
-	check(is_equal_approx(result.report.task_delta.i, 3.0), "零脑洞且美术非零时同样使用 0.1 下限")
+	check(is_equal_approx(result.report.task_delta.i, quantized(3.0 * factor)), "零脑洞且美术非零时同样使用 0.1 下限")
 	for stats in [[0, 2, 1, 0], [0, 1, 10, 0]]:
 		Model.DEFINITIONS[0].stats = stats
 		result = Model.execute_task(initial, 0, "art_concept", 1, 1)
-		check(is_equal_approx(result.report.task_delta.i, result.report.task_delta.p * float(stats[1]) / float(stats[2])), "系数上下边界保持原值")
+		check(absf(float(result.report.task_delta.i) - float(result.report.task_delta.p) * float(stats[1]) / float(stats[2])) < 0.001, "系数上下边界保持原值")
 	Model.DEFINITIONS[0].stats = [0, 0, 0, 0]
 	result = Model.execute_task(initial, 0, "art_concept", 1, 1)
 	check(result.report.task_delta.i == 0 and result.report.task_delta.p == 0, "全零属性得到有限零产出")
@@ -78,12 +85,17 @@ func _run() -> void:
 	result = Model.execute_task(initial, 0, "art_concept", 1, 12)
 	check(result.state.year == 1 and result.state.month == 12 and result.state.action_steps == 0, "十二月执行任务也不跨年")
 	advanced = Model.advance_work(result.state, 1, 12)
-	check(advanced.state.year == 2 and advanced.state.month == 1 and advanced.state.action_steps == 1 and Model.available_tasks(advanced.state).size() == 1, "排期跨年后恢复步数与任务次数")
+	check(advanced.state.year == 2 and advanced.state.month == 1 and advanced.state.action_steps == 1, "排期跨年后恢复行动步数")
+	check(Model.available_tasks(advanced.state).is_empty(), "跨年尚未立项时没有可执行任务")
+	var second_year: Dictionary = Model.select_project(advanced.state, "第二年", "act", "modern", 2).state
+	check(Model.available_tasks(second_year).size() == 1, "次年立项后任务次数恢复")
 	initial.phase = "report"
 	check(not Model.execute_task(initial, 0, "art_concept", 1, 12).ok, "报告阶段不能执行任务")
 	Model.DEFINITIONS = definitions
 	# 使用正式属性的基础产出作对照，避免假设人物表始终为零能力。
-	var base_task := Model.execute_task(Model.fresh(), 0, "art_concept", 1, 1)
+	var baseline: Dictionary = Model.select_project(Model.fresh(), "任务对照", "act", "modern", 1).state
+	var base_task := Model.execute_task(baseline, 0, "art_concept", 1, 1)
+	var base_factor := Model.task_output_factor(baseline, 0, "art_concept")
 	var slot_id: String = Model.DEFINITIONS[0].skills[0].skill_id
 	var original_skill = SkillTable.skills[slot_id]
 	var skill_row := {"id": slot_id, "name": "任务测试技能", "description": "测试", "quip": "任务完成",
@@ -94,14 +106,18 @@ func _run() -> void:
 			"effect_id": "numeric_modifier", "params": {"field": "affinity", "operation": "add", "amount": 2}, "priority": 0}]}
 	check(SkillDefinition.validate(skill_row).is_empty(), "任务技能配置合法")
 	SkillTable.skills[slot_id] = SkillDefinition.from_row(skill_row)
-	result = Model.execute_task(Model.fresh(), 0, "art_concept", 1, 1)
-	check(is_equal_approx(result.report.task_delta.i, base_task.report.task_delta.i + 5) and result.state.members[0].affinity == base_task.state.members[0].affinity + 2 and result.report.skill_events.size() == 2, "任务前后技能生效并进入结果报告")
+	var matched: Dictionary = Model.select_project(Model.fresh(), "任务技能", "act", "modern", 1).state
+	result = Model.execute_task(matched, 0, "art_concept", 1, 1)
+	# 转换单元在 ACTION_BEFORE 之前，对比时先把基础产出还原到同系数基准再加技能加成。
+	var expected_i: float = base_task.report.task_delta.i / base_factor * Model.task_output_factor(matched, 0, "art_concept") + 5.0
+	check(is_equal_approx(result.report.task_delta.i, expected_i) and result.state.members[0].affinity == base_task.state.members[0].affinity + 2 and result.report.skill_events.size() == 2, "任务前后技能生效并进入结果报告")
 	check(result.report.skill_events.all(func(record: Dictionary): return record.hook in ["ACTION_BEFORE", "ACTION_AFTER"]), "任务仅触发任务阶段技能")
 	SkillTable.skills[slot_id] = original_skill
 	var scene = load("res://scenes/interface_shell.tscn").instantiate()
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
+	scene.state = Model.select_project(Model.fresh(), "任务界面测试", "act", "modern", 1).state
 	scene.show_main()
 	scene.open_character("a")
 	await click(scene.member_sheet.task_button.get_global_rect().get_center())
@@ -189,6 +205,11 @@ func _run() -> void:
 	check(scene.task_panel.visible and scene.task_panel.task_buttons.is_empty(), "步数恢复后允许打开列表，已完成年度任务仍隐藏")
 	scene.task_panel.close()
 	scene.state.year = 2
+	scene.state.month = 1
+	scene.state.action_steps = 1
+	var next_year := Model.select_project(scene.state, "第二年", "act", "modern", 2)
+	check(next_year.ok, "次年开始新的年度作品")
+	scene.state = next_year.state
 	scene.open_tasks()
 	check(scene.task_panel.task_buttons.size() == 1, "新年重新显示任务")
 	await click(scene.task_panel.task_buttons[0].get_global_rect().get_center())

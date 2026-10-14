@@ -2,6 +2,7 @@ extends Control
 ## 只维护未确认的表单草稿；确认后由 ClubGame 校验并写入年度作品档案。
 signal project_requested(title: String, genre_id: String, topic_id: String, year: int)
 const Catalog = preload("res://scripts/game_catalog.gd")
+const Model = preload("res://scripts/game_model.gd")
 const PAPER := Color("fffdf7")
 const INK := Color("203e42")
 const TEAL := Color("2a6965")
@@ -10,6 +11,7 @@ const MUTED := Color("72817a")
 var title_input: LineEdit
 var year_label: Label
 var preview_label: Label
+var affinity_label: Label
 var hint_label: Label
 var confirm_button: Button
 var genre_buttons: Array[Button] = []
@@ -17,6 +19,8 @@ var topic_buttons: Array[Button] = []
 var genre_id := ""
 var topic_id := ""
 var selection_year := 1
+## 打开选择页时读入的好感度快照：预览要在上限内显示本次真实增益。
+var affinities: Array = []
 var sidebar: PanelContainer
 var genre_grid: GridContainer
 var topic_grid: GridContainer
@@ -83,9 +87,16 @@ func _ready() -> void:
 	var preview := PanelContainer.new()
 	preview.add_theme_stylebox_override("panel", _box(Color("e6e9dd"), Color("e6e9dd"), 18))
 	column.add_child(preview)
+	var preview_column := VBoxContainer.new()
+	preview_column.add_theme_constant_override("separation", 8)
+	preview.add_child(preview_column)
 	preview_label = _label("", 22)
 	preview_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	preview.add_child(preview_label)
+	preview_column.add_child(preview_label)
+	## 立项好感预览：只显示本次选择会加好感的成员，判定交给模型。
+	affinity_label = _label("", 21)
+	affinity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_column.add_child(affinity_label)
 	hint_label = _label("", 18, MUTED)
 	column.add_child(hint_label)
 	confirm_button = Button.new()
@@ -124,8 +135,11 @@ func _choices(parent: VBoxContainer, options: Array, buttons: Array[Button], is_
 		buttons.append(button)
 	return grid
 
-func open(year: int) -> void:
+func open(year: int, current_affinities: Array = []) -> void:
 	selection_year = year
+	affinities.clear()
+	for value in current_affinities:
+		affinities.append(int(value))
 	genre_id = ""
 	topic_id = ""
 	title_input.text = ""
@@ -145,6 +159,48 @@ func _refresh() -> void:
 		"未选题材" if topic_id.is_empty() else Catalog.display_name(Catalog.TOPICS, topic_id)]
 	confirm_button.disabled = title.is_empty() or genre_id.is_empty() or topic_id.is_empty()
 	hint_label.text = "请填写名字，并选好类型和题材。" if confirm_button.disabled else "准备好了，开始今年的开发吧。"
+	_refresh_affinity()
+
+## 立项好感预览：实时列出因偏好命中而加好感的成员；匹配、上限与真实增量都由模型规则决定。
+func _refresh_affinity() -> void:
+	var genre_name := Catalog.display_name(Catalog.GENRES, genre_id)
+	var topic_name := Catalog.display_name(Catalog.TOPICS, topic_id)
+	if genre_name.is_empty() and topic_name.is_empty():
+		_set_affinity_text("立项好感：选好类型与题材后，这里显示谁会加好感。", MUTED)
+		return
+	var matched: Array[String] = []
+	for index in Model.DEFINITIONS.size():
+		var definition: Dictionary = Model.DEFINITIONS[index]
+		var genre_gain := Model.preference_bonus(index, genre_id, "")
+		var topic_gain := Model.preference_bonus(index, "", topic_id)
+		var total := genre_gain + topic_gain
+		if total <= 0:
+			continue
+		var current := current_affinity(index)
+		var gain := clampi(current + total, 0, Model.AFFINITY_MAX) - current
+		if gain <= 0:
+			matched.append("%s 好感已满（%d/%d）" % [definition.name, current, Model.AFFINITY_MAX])
+			continue
+		var reasons: Array[String] = []
+		if genre_gain > 0:
+			reasons.append("类型 %s +%d" % [genre_name, genre_gain])
+		if topic_gain > 0:
+			reasons.append("题材 %s +%d" % [topic_name, topic_gain])
+		if gain < total:
+			reasons.append("受上限 %d 限制" % Model.AFFINITY_MAX)
+		matched.append("%s +%d（%s）" % [definition.name, gain, "、".join(reasons)])
+	if matched.is_empty():
+		_set_affinity_text("立项好感：没有成员命中本次类型与题材。", MUTED)
+		return
+	_set_affinity_text("立项好感：" + "　".join(matched), TEAL)
+
+## 选择页停留期间不能执行任何行动，所以好感度只在打开时读一次。
+func current_affinity(index: int) -> int:
+	return int(affinities[index]) if index < affinities.size() else 0
+
+func _set_affinity_text(text: String, color: Color) -> void:
+	affinity_label.text = text
+	affinity_label.add_theme_color_override("font_color", color)
 
 func _submit() -> void:
 	if not visible or confirm_button.disabled:

@@ -17,7 +17,7 @@ func _initialize() -> void:
 func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
-	var initial := Model.fresh()
+	var initial: Dictionary = Model.select_project(Model.fresh(), "邀约测试", "act", "modern", 1).state
 	var result := Model.execute_invite(initial, 0, 1, 1)
 	check(result.ok and result.state.members[0].affinity == 10, "邀约固定提升十好感")
 	check(initial.members[0].affinity == 0 and initial.action_steps == 1, "邀约不修改输入状态")
@@ -67,6 +67,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
+	scene.state = Model.select_project(Model.fresh(), "邀约界面测试", "act", "modern", 1).state
 	scene.show_main()
 	scene.open_character("a")
 	var button: Button = scene.member_sheet.invite_button
