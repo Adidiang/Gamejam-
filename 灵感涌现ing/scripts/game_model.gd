@@ -385,10 +385,10 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 		var raw := {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}
 		match int(member.role):
 			0:
-				## 玩法开发：游戏性 +（0.7 编程 + 0.5 脑洞），创新性 +（1.2 脑洞），Bug +（（脑洞 − 编程）× 0.1 向下取整）。
+				## 玩法开发：Bug 增量向下取整后最低为 0，不承担修复。
 				raw.g = 0.7 * stats[0] + 0.5 * stats[1]
 				raw.i = 1.2 * stats[1]
-				raw.b = floorf((stats[1] - stats[0]) * 0.1)
+				raw.b = maxf(0.0, floorf((stats[1] - stats[0]) * 0.1))
 			1:
 				## 美术开发：表现力 +（0.8 美术 + 0.2 脑洞），创新性 +（0.3 美术 + 0.2 脑洞）。
 				raw.p = 0.8 * stats[2] + 0.2 * stats[1]

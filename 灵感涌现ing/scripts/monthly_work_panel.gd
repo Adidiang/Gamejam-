@@ -177,6 +177,8 @@ func _show_values(fraction: float, id: int) -> void:
 		return
 	var lines: Array[String] = []
 	for index in KEYS.size():
+		if KEYS[index] == "b" and float(contribution.b) <= 0.0:
+			continue
 		lines.append("%s  %s" % [CAPTIONS[index], NumberDisplay.text(float(contribution[KEYS[index]]) * fraction, true)])
 	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3, 5))
 
@@ -185,6 +187,8 @@ func _month_summary_text() -> String:
 	var totals := _month_totals()
 	var lines: Array[String] = []
 	for index in KEYS.size():
+		if KEYS[index] == "b" and float(totals.b) <= 0.0:
+			continue
 		lines.append("%s %s" % [CAPTIONS[index], NumberDisplay.text(float(totals[KEYS[index]]), true)])
 	var head := "本月总计：" + "   ·   ".join(lines.slice(0, 3))
 	var tail := "   ·   ".join(lines.slice(3, 5))

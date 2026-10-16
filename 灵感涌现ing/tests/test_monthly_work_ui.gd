@@ -40,6 +40,14 @@ func _run() -> void:
 	check(result.state.work.keys() == ["g", "i", "p", "b"], "作品属性只有游戏性、创新性、表现力与 Bug")
 	check(is_equal_approx(result.state.work.b, 30.0 + 1.0 * factors[0] - 10.0 * factors[3]), "新增 Bug 与岗位修复同时结算")
 	check(is_equal_approx(result.report.contributions[3].repair, 10.0 * factors[3]), "修复贡献保留能力值并经过转换单元")
+	var gameplay_only: Dictionary = initial.duplicate(true)
+	for id in range(1, gameplay_only.members.size()):
+		gameplay_only.members[id].recruited = false
+	for stats in [[30, 10, 0, 0], [10, 10, 0, 0], [10, 19, 0, 0]]:
+		Model.DEFINITIONS[0].stats = stats
+		var no_bugs := Model.advance_work(gameplay_only, 1, 1)
+		check(no_bugs.report.contributions[0].b == 0.0 and no_bugs.state.work.b == 30.0, "玩法 Bug 增量为负、零或取整为零时不产生也不修复 Bug")
+	Model.DEFINITIONS[0].stats = [10, 20, 30, 40]
 	## 转换单元：系数始终落在 0.5～1.5，同种子可复现，不同事件各不相同。
 	var unit_values: Array = []
 	var in_range := true
@@ -120,19 +128,22 @@ func _run() -> void:
 	var original_report: Dictionary = panel.report
 	panel.report = original_report.duplicate(true)
 	panel.report.contributions[0].g = 1.9
-	panel.report.contributions[0].b = -1.2
+	for contribution in panel.report.contributions:
+		contribution.b = 0.0
 	panel.report.contributions[1].g = 1.9
 	panel.report.contributions[2].g = 0.0
 	panel.report.contributions[3].g = 0.0
 	var display_snapshot: Dictionary = panel.report.duplicate(true)
 	panel._show_values(0.5, 0)
-	check(panel.value_labels[0].text.contains("游戏性  +0") and panel.value_labels[0].text.contains("Bug  -1"), "递增动画也向下取整，负数不出现正负号叠加")
+	check(panel.value_labels[0].text.contains("游戏性  +0") and not panel.value_labels[0].text.contains("Bug"), "递增动画向下取整，零 Bug 产出不显示")
 	panel._show_values(1.0, 0)
-	check(panel.value_labels[0].text.contains("游戏性  +1") and panel.value_labels[0].text.contains("Bug  -2"), "完整产出对正负小数都向下取整")
+	check(panel.value_labels[0].text.contains("游戏性  +1") and not panel.value_labels[0].text.contains("Bug"), "完整产出向下取整，零 Bug 产出不显示")
+	check(not panel._month_summary_text().contains("Bug"), "全员零 Bug 产出时汇总不显示 Bug")
 	check(panel._month_summary_text().contains("游戏性 +3"), "先合计真实小数再取整，不把成员显示值相加")
 	check(panel.report == display_snapshot and scene.state == snapshot, "动画与汇总显示保留报告和模型真实数值")
 	panel.report = original_report
 	panel._show_values(1.0, 0)
+	check(panel.value_labels[0].text.contains("Bug  +"), "正数 Bug 产出仍正常显示")
 	for resolution in [Vector2i(1280, 720), Vector2i(1920, 1080)]:
 		root.size = resolution
 		for frame in 4:
