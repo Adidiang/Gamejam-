@@ -2,7 +2,7 @@ class_name ClubGame
 extends RefCounted
 ## Deterministic rules. UI previews use a copied state and the same resolver as commit.
 
-const VERSION := 5
+const VERSION := 6
 ## 全局资源：归整个社团共有，可由回合、奖励和技能获得，供技能等系统消费。
 ## 与作品属性、人物属性分开保存；继续沿用已有余额字段及数值。
 const INSPIRATION := {"name": "灵感", "initial": 2, "maximum": 10000, "monthly_gain": 1}
@@ -48,13 +48,86 @@ static var DEFINITIONS: Array = CharacterTable.definitions()
 static func fresh() -> Dictionary:
 	var members: Array = []
 	for id in DEFINITIONS.size():
-		members.append({"id": DEFINITIONS[id].id, "affinity": DEFINITIONS[id].affinity, "role": [0, 0, 1, 2][id], "learned_skills": [], "ability_growth": [0.0, 0.0, 0.0, 0.0]})
+		members.append({"id": DEFINITIONS[id].id, "affinity": DEFINITIONS[id].affinity, "recruited": false, "role": ([0, 0, 1, 2][id] if id < 4 else 2), "learned_skills": [], "ability_growth": [0.0, 0.0, 0.0, 0.0]})
 	return {"version": VERSION, "phase": "setup", "year": 1, "month": 1, "inspiration": INSPIRATION.initial, "action_steps": 1,
 		"run_id": "%.6f:%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()],
 		"skill_runtime": {"events": {}, "counts": {}, "temporary": []}, "skill_log": [],
-		"members": members,
+		"members": members, "recruitment": {},
 		"work": {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0},
 		"annual_project_schema": 1, "annual_projects": {}, "annual_results": {}}
+
+## 开始界面的初始阵容：必须是两名不同的有效角色，直接入社，无年初加入事件。
+static func start_with_members(character_ids: Array) -> Dictionary:
+	if character_ids.size() != 2: return {"ok": false}
+	var available := CharacterTable.initial_ids()
+	if not character_ids[0] is String or not character_ids[1] is String or character_ids[0] == character_ids[1] or character_ids[0] not in available or character_ids[1] not in available:
+		return {"ok": false}
+	var state := fresh()
+	for id in character_ids: state.members[available.find(id)].recruited = true
+	return {"ok": true, "state": state}
+
+## 所有角色保留固定编号；只有已加入者参与玩法。
+static func is_recruited(state: Dictionary, member_id: int) -> bool:
+	return member_id >= 0 and member_id < state.members.size() and bool(state.members[member_id].get("recruited", false))
+
+static func recruited_ids(state: Dictionary) -> Array:
+	var result: Array = []
+	for member_id in state.members.size():
+		if is_recruited(state, member_id): result.append(member_id)
+	return result
+
+## 十二月结算后只根据刚结束的作品抽选，加入仍由年初事件逐人确认。
+static func _prepare_recruitment(state: Dictionary) -> void:
+	var key := str(int(state.year))
+	if int(state.year) <= 1 or state.recruitment.has(key): return
+	var previous := project_for_year(state, int(state.year) - 1)
+	var candidates: Array = []
+	if not previous.is_empty():
+		for member_id in DEFINITIONS.size():
+			if not is_recruited(state, member_id) and preference_bonus(member_id, previous.genre_id, previous.topic_id) > 0:
+				candidates.append(DEFINITIONS[member_id].id)
+	var selected: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = ("%s:recruitment:%d" % [state.run_id, int(state.year)]).hash()
+	while not candidates.is_empty() and selected.size() < 2:
+		var index := rng.randi_range(0, candidates.size() - 1)
+		selected.append(candidates[index])
+		candidates.remove_at(index)
+	state.recruitment[key] = {"selected": selected, "confirmed": 0}
+
+static func pending_recruits(state: Dictionary) -> Array:
+	var record: Dictionary = state.get("recruitment", {}).get(str(int(state.year)), {})
+	return record.get("selected", []).slice(int(record.get("confirmed", 0)))
+
+static func confirm_recruit(state: Dictionary, character_id: String) -> Dictionary:
+	var pending := pending_recruits(state)
+	if int(state.month) != 1 or not needs_project_selection(state) or pending.is_empty() or pending[0] != character_id:
+		return {"ok": false}
+	var member_id := CharacterTable.initial_ids().find(character_id)
+	if member_id < 0 or is_recruited(state, member_id): return {"ok": false}
+	var next := state.duplicate(true)
+	next.members[member_id].recruited = true
+	next.recruitment[str(int(next.year))].confirmed += 1
+	return {"ok": true, "state": next}
+
+static func _valid_recruitment(state: Dictionary) -> bool:
+	if not state.recruitment is Dictionary: return false
+	var known: Array = state.members.map(func(member: Dictionary): return member.id)
+	var seen: Array = []
+	for year_key in state.recruitment:
+		if not year_key is String or not year_key.is_valid_int() or str(int(year_key)) != year_key: return false
+		var year := int(year_key)
+		if year < 2 or year > int(state.year): return false
+		var record: Variant = state.recruitment[year_key]
+		if not record is Dictionary or not record.has_all(["selected", "confirmed"]): return false
+		if not record.selected is Array or record.selected.size() > 2 or not _finite_range(record.confirmed, 0, record.selected.size()) or float(record.confirmed) != int(record.confirmed): return false
+		if int(record.confirmed) < record.selected.size() and (year != int(state.year) or int(state.month) != 1 or not needs_project_selection(state)): return false
+		for index in record.selected.size():
+			var id: Variant = record.selected[index]
+			if not id is String or id not in known or id in seen: return false
+			seen.append(id)
+			if is_recruited(state, known.find(id)) != (index < int(record.confirmed)): return false
+	return true
 
 ## 喜欢的类型／题材：按显示名匹配，支持“奇幻、科幻”这样的多项偏好。
 static func preference_bonus(id: int, genre_id: String, topic_id: String) -> int:
@@ -77,7 +150,7 @@ static func needs_project_selection(state: Dictionary) -> bool:
 	return state.has("annual_projects") and project_for_year(state).is_empty()
 
 static func select_project(state: Dictionary, title: String, genre_id: String, topic_id: String, expected_year: int) -> Dictionary:
-	if not needs_project_selection(state) or int(state.year) != expected_year or int(state.month) != 1 or state.phase not in ["setup", "ready"]:
+	if not pending_recruits(state).is_empty() or not needs_project_selection(state) or int(state.year) != expected_year or int(state.month) != 1 or state.phase not in ["setup", "ready"]:
 		return {"ok": false}
 	var profile := {"id": "%s:project:%d" % [state.run_id, expected_year], "year": expected_year,
 		"title": title.strip_edges(), "genre_id": genre_id, "topic_id": topic_id}
@@ -87,7 +160,7 @@ static func select_project(state: Dictionary, title: String, genre_id: String, t
 	next.annual_projects[str(expected_year)] = profile
 	## 立项时先结算偏好好感，再派发立项技能；技能仍可在其之上继续修正。
 	var plan := _plan(next)
-	for id in range(4): plan.affinity[DEFINITIONS[id].id] = preference_bonus(id, genre_id, topic_id)
+	for id in recruited_ids(state): plan.affinity[DEFINITIONS[id].id] = preference_bonus(id, genre_id, topic_id)
 	var metadata := _metadata(next)
 	var before := SkillRunner.run(next, DEFINITIONS, "PROJECT_BEFORE", metadata, plan)
 	_apply_plan(next, before.plan)
@@ -171,7 +244,7 @@ static func invite_gain(state: Dictionary, id: int) -> int:
 	return mini(AFFINITY_MAX - int(state.members[id].affinity), 10)
 
 static func learn(state: Dictionary, id: int, slot_index: int = 0) -> Dictionary:
-	if state.phase not in ["setup", "ready"] or id < 0 or id >= 4 or slot_index < 0 or slot_index >= SKILL_SLOTS:
+	if state.phase not in ["setup", "ready"] or id < 0 or id >= DEFINITIONS.size() or not is_recruited(state, id) or slot_index < 0 or slot_index >= SKILL_SLOTS:
 		return state
 	var slot: Dictionary = DEFINITIONS[id].skills[slot_index]
 	var skill = SkillTable.skills.get(slot.skill_id)
@@ -185,7 +258,7 @@ static func learn(state: Dictionary, id: int, slot_index: int = 0) -> Dictionary
 
 static func assign(state: Dictionary, id: int, role: int) -> Dictionary:
 	## 调整职责不消耗回合：立项准备和每月准备阶段都可自由调整，报告与结局阶段禁止。
-	if state.phase not in ["setup", "ready"] or id < 0 or id >= 4 or role < 0 or role >= 4:
+	if state.phase not in ["setup", "ready"] or id < 0 or id >= DEFINITIONS.size() or not is_recruited(state, id) or role < 0 or role >= 4:
 		return state
 	var next := state.duplicate(true)
 	next.members[id].role = role
@@ -222,6 +295,8 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	next.year = expected_year + 1 if expected_month == 12 else expected_year
 	SkillRunner.clear_expired_project_effect(next)
 	next.action_steps = 1
+	if expected_month == 12:
+		_prepare_recruitment(next)
 	return {"ok": true, "state": next, "report": report}
 
 ## 任务次数归当前作品（年份）共有，不因更换执行成员而重置。
@@ -234,13 +309,13 @@ static func action_steps(state: Dictionary) -> int:
 static func available_tasks(state: Dictionary) -> Array:
 	if needs_project_selection(state):
 		return []
-	if state.phase not in ["setup", "ready"] or action_steps(state) < 1:
+	if state.phase not in ["setup", "ready"] or action_steps(state) < 1 or recruited_ids(state).is_empty():
 		return []
 	var completed: Array = state.get("completed_tasks", {}).get(str(int(state.year)), [])
 	return TASKS.filter(func(task: Dictionary): return task.id not in completed)
 
 static func execute_task(state: Dictionary, member_id: int, task_id: String, expected_year: int, expected_month: int) -> Dictionary:
-	if member_id < 0 or member_id >= DEFINITIONS.size() or int(state.year) != expected_year or int(state.month) != expected_month:
+	if not is_recruited(state, member_id) or int(state.year) != expected_year or int(state.month) != expected_month:
 		return {"ok": false}
 	var available := available_tasks(state)
 	if not available.any(func(task: Dictionary): return task.id == task_id):
@@ -262,7 +337,7 @@ static func execute_task(state: Dictionary, member_id: int, task_id: String, exp
 static func execute_invite(state: Dictionary, member_id: int, expected_year: int, expected_month: int) -> Dictionary:
 	if needs_project_selection(state):
 		return {"ok": false}
-	if state.phase not in ["setup", "ready"] or action_steps(state) < 1 or member_id < 0 or member_id >= DEFINITIONS.size():
+	if state.phase not in ["setup", "ready"] or action_steps(state) < 1 or not is_recruited(state, member_id):
 		return {"ok": false}
 	if int(state.year) != expected_year or int(state.month) != expected_month:
 		return {"ok": false}
@@ -304,7 +379,7 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictionary:
 	var records: Array = []
 	var duty_plan := _plan(state)
-	for member_id in range(4):
+	for member_id in recruited_ids(state):
 		var stats := ability(state, member_id)
 		var member: Dictionary = state.members[member_id]
 		var raw := {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}
@@ -332,7 +407,7 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 	var sleeping: Array = stage.sleeping
 	var contributions: Array = []
 	for member in state.members:
-		contributions.append(stage.plan.contributions[member.id].duplicate(true))
+		contributions.append(stage.plan.contributions.get(member.id, {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}).duplicate(true))
 	_apply_plan(state, stage.plan)
 	records.append_array(stage.records)
 	metadata.duty_result = stage.plan.duplicate(true)
@@ -367,6 +442,7 @@ static func _apply_plan(state: Dictionary, plan: Dictionary) -> void:
 		delta.b -= float(contribution.repair)
 	for key in delta: state.work[key] = clampf(float(state.work.get(key, 0.0)) + float(delta[key]), 0.0, 100000.0)
 	for member in state.members:
+		if not member.recruited: continue
 		member.affinity = clampi(int(member.affinity) + roundi(float(plan.affinity[member.id])), 0, AFFINITY_MAX)
 	_change_inspiration(state, roundi(float(plan.inspiration)))
 
@@ -460,7 +536,7 @@ static func _resolve_annual_award(state: Dictionary, records: Array) -> Dictiona
 
 ## 校验新游戏状态：只有一份年度作品档案与评奖档案，没有旧原型字段。
 static func valid_state(value: Variant) -> bool:
-	if DEFINITIONS.size() != 4: return false
+	if DEFINITIONS.is_empty(): return false
 	if not value is Dictionary:
 		return false
 	for key in fresh():
@@ -494,7 +570,7 @@ static func valid_state(value: Variant) -> bool:
 		if not _valid_annual_result(value.annual_results[year_key], result_year, value.run_id): return false
 	for finished_year in range(1, int(value.year)):
 		if not value.annual_results.has(str(finished_year)): return false
-	if not value.members is Array or value.members.size() != 4 or not value.work is Dictionary:
+	if not value.members is Array or value.members.size() != DEFINITIONS.size() or not value.work is Dictionary:
 		return false
 	if value.work.has("p") and not _finite_range(value.work.p, 0, 100000): return false
 	if value.has("completed_tasks"):
@@ -503,9 +579,9 @@ static func valid_state(value: Variant) -> bool:
 			if not year_key is String or not year_key.is_valid_int() or str(int(year_key)) != year_key or int(year_key) < 1 or int(year_key) > int(value.year) or not value.completed_tasks[year_key] is Array: return false
 			var tasks: Array = value.completed_tasks[year_key]
 			if tasks.size() > 1 or (tasks.size() == 1 and tasks[0] != "art_concept"): return false
-	for member_id in 4:
+	for member_id in DEFINITIONS.size():
 		var member: Variant = value.members[member_id]
-		if not member is Dictionary or not member.has_all(["affinity", "role", "learned_skills"]):
+		if not member is Dictionary or not member.has_all(["affinity", "role", "learned_skills", "recruited"]) or not member.recruited is bool:
 			return false
 		if member.get("id", "") != DEFINITIONS[member_id].id:
 			return false
@@ -523,6 +599,7 @@ static func valid_state(value: Variant) -> bool:
 			learned_ids.append(skill_id)
 		if float(member.role) != int(member.role) or float(member.affinity) != int(member.affinity):
 			return false
+	if not _valid_recruitment(value): return false
 	var runtime_max_year := maxi(3, int(value.year))
 	if not SkillRunner.valid_runtime(value.skill_runtime, value.members, runtime_max_year) or not SkillRunner.valid_records(value.skill_log, value.members): return false
 	for key in ["g", "i", "p", "b"]:

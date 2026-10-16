@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 const Model = preload("res://scripts/game_model.gd")
 const Catalog = preload("res://scripts/game_catalog.gd")
 const Store = preload("res://scripts/save_store.gd")
@@ -19,7 +20,7 @@ func _initialize() -> void:
 func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
-	var initial := Model.fresh()
+	var initial := Roster.fresh()
 	check(Model.valid_state(initial) and Model.needs_project_selection(initial), "年初待选择状态可存档")
 	check(not Model.advance_work(initial, 1, 1).ok and Model.available_tasks(initial).is_empty() and not Model.execute_invite(initial, 0, 1, 1).ok, "未选择作品时拒绝工作和行动")
 	for bad in [["  ", "act", "fantasy"], ["名字", "unknown", "fantasy"], ["名字", "act", "unknown"], ["多\n行", "act", "fantasy"]]:
@@ -84,9 +85,9 @@ func _run() -> void:
 	check(SkillDefinition.validate(skill_row).is_empty(), "技能配置接受稳定的类型题材 ID")
 	var original_skill = SkillTable.skills[skill_id]
 	SkillTable.skills[skill_id] = SkillDefinition.from_row(skill_row)
-	var matching: Dictionary = Model.select_project(Model.fresh(), "条件测试", "narrative", "sci_fi", 1).state
+	var matching: Dictionary = Model.select_project(Roster.fresh(), "条件测试", "narrative", "sci_fi", 1).state
 	check(matching.inspiration == 5 and not matching.skill_log.is_empty(), "立项技能实际按类型题材 ID 触发")
-	var not_matching: Dictionary = Model.select_project(Model.fresh(), "条件测试", "narrative", "fantasy", 1).state
+	var not_matching: Dictionary = Model.select_project(Roster.fresh(), "条件测试", "narrative", "fantasy", 1).state
 	check(not_matching.inspiration == 2, "不匹配题材时不触发立项技能")
 	check(not Model.select_project(matching, "重复确认", "narrative", "sci_fi", 1).ok and matching.inspiration == 5, "重复确认不能重复发放立项技能收益")
 	matching.month = 12
@@ -98,13 +99,16 @@ func _run() -> void:
 	check(not SkillDefinition.validate(skill_row).is_empty(), "技能配置中的非法类型 ID 被拒绝")
 	for genre in Catalog.GENRES:
 		for topic in Catalog.TOPICS:
-			check(Model.select_project(Model.fresh(), "组合", genre.id, topic.id, 1).ok, "6×5 种组合全部有效")
+			check(Model.select_project(Roster.fresh(), "组合", genre.id, topic.id, 1).ok, "6×5 种组合全部有效")
 	var scene = load("res://scenes/interface_shell.tscn").instantiate()
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
 	check(scene.start_screen.visible and not scene.game_selection.visible, "初始保留开始页")
+	Roster.select_starting_pair(scene)
 	scene.start_button.pressed.emit()
+	Roster.recruit_all(scene.state)
+	scene.open_game_selection()
 	await process_frame
 	var screen = scene.game_selection
 	check(screen.visible and not scene.main_screen.visible and screen.get_global_rect() == scene.get_global_rect(), "开始游戏进入全屏选择页")
@@ -150,7 +154,7 @@ func _run() -> void:
 	check(scene.work_panel.visible and not screen.visible and scene.work_panel.report.project.title == "UI 测试游戏", "跨年先展示十二月旧作品工作报告")
 	# 等真实播放结束，避免跳过生产流程。
 	var started := Time.get_ticks_msec()
-	while scene.work_panel.playing and Time.get_ticks_msec() - started < 15000:
+	while scene.work_panel.playing and Time.get_ticks_msec() - started < 35000:
 		await process_frame
 	scene.work_panel.finish_button.pressed.emit()
 	await process_frame
@@ -172,7 +176,7 @@ func _run() -> void:
 	check(screen.affinity_label.text.contains("好感已满") and not screen.affinity_label.text.contains(Model.DEFINITIONS[0].name + " +"), "满好感成员的偏好奖励在预览中标注为已满")
 	var capped_screen = load("res://scripts/game_selection_screen.gd").new()
 	root.add_child(capped_screen)
-	capped_screen.open(2, [Model.AFFINITY_MAX - 5, 0, 0, 0])
+	capped_screen.open(2, [Model.AFFINITY_MAX - 5, 0, 0, 0], [true, true, true, true])
 	capped_screen.topic_buttons[0].pressed.emit()
 	check(capped_screen.affinity_label.text.contains("+5") and capped_screen.affinity_label.text.contains("受上限 %d 限制" % Model.AFFINITY_MAX), "接近上限时预览显示上限内的真实增量")
 	capped_screen.queue_free()

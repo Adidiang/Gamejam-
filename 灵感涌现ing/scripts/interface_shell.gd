@@ -1,5 +1,5 @@
 extends Control
-## 新界面骨架：开始页 → 四个人物入口 → 人物资料页。
+## 新界面骨架：开始页 → 十个人物入口 → 人物资料页。
 ## 主界面背景取自 assets/backgrounds 下的图片，写进场景里的 Background 节点，
 ## 这样在编辑器里能直接对着背景图调人物矩形；缺图时隐藏该节点、回退场景纯色底。
 ## 人物入口的立绘按人物表路径写进场景里的 Portrait 子节点；配好立绘的入口除立绘外全透明，缺立绘时保留编号矩形。
@@ -13,6 +13,8 @@ const TaskExecution = preload("res://scripts/task_execution_panel.gd")
 const CharacterTable = preload("res://scripts/character_table.gd")
 const GameCatalog = preload("res://scripts/game_catalog.gd")
 const GameSelection = preload("res://scripts/game_selection_screen.gd")
+const StartingRoster = preload("res://scripts/starting_roster.gd")
+const RecruitmentPanel = preload("res://scripts/recruitment_panel.gd")
 const AnnualAward = preload("res://scripts/annual_award_screen.gd")
 const DebugTools = preload("res://scripts/debug/debug_tools.gd")
 const DebugPanel = preload("res://scripts/debug/debug_panel.gd")
@@ -22,6 +24,7 @@ const PAPER := Color("fffdf7")
 const INK := Color("203e42")
 const TEAL := Color("2a6965")
 const GOLD := Color("efc56c")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 const BACKGROUND_PATH := "res://assets/backgrounds/clubroom.png"
 const BACKGROUND_NODE := "Background"
 const PORTRAIT_NODE := "Portrait"
@@ -48,8 +51,12 @@ const PORTRAIT_FOCUS_HINT := false
 @onready var character_buttons: Array[Button] = [
 	$MainScreen/CharacterA, $MainScreen/CharacterB,
 	$MainScreen/CharacterC, $MainScreen/CharacterD,
+	$MainScreen/CharacterE, $MainScreen/CharacterF,
+	$MainScreen/CharacterG, $MainScreen/CharacterH,
+	$MainScreen/CharacterI, $MainScreen/CharacterJ,
 ]
 
+var starting_roster: Control
 var selected_character: String = ""
 var state: Dictionary = Model.fresh()
 var member_sheet: PanelContainer
@@ -62,6 +69,7 @@ var game_selection: Control
 ## 十二月结算得到的年度评奖结果；工作展示确认后交给评奖界面播放。
 var pending_annual: Dictionary = {}
 var award_screen: Control
+var recruitment_panel: Control
 ## 调试：面板只在 DebugTools.enabled() 时创建；满好感默认开启，随时可以在面板里关掉。
 var debug_button: Button
 var debug_panel: Control
@@ -69,7 +77,7 @@ var debug_full_affinity := true
 var debug_affinity_backup: Array = []
 
 func _ready() -> void:
-	if CHARACTER_IDS.size() != 4 or Model.DEFINITIONS.size() != 4:
+	if CHARACTER_IDS.size() != character_buttons.size() or Model.DEFINITIONS.size() != CHARACTER_IDS.size():
 		push_error("请修正 data/characters.json 后重新运行。")
 		get_tree().quit(1)
 		return
@@ -120,7 +128,16 @@ func _ready() -> void:
 	award_screen.name = "AnnualAwardScreen"
 	add_child(award_screen)
 	award_screen.closed.connect(_on_award_closed)
+	recruitment_panel = RecruitmentPanel.new()
+	recruitment_panel.name = "RecruitmentPanel"
+	add_child(recruitment_panel)
+	recruitment_panel.confirmed.connect(_confirm_recruit)
 	_build_debug_tools()
+	starting_roster = StartingRoster.new()
+	starting_roster.name = "StartingRoster"
+	start_screen.add_child(starting_roster)
+	starting_roster.selection_changed.connect(func(): start_button.disabled = not starting_roster.is_complete())
+	start_button.disabled = true
 	start_button.pressed.connect(start_game)
 	close_button.pressed.connect(close_character)
 	for index in character_buttons.size():
@@ -134,9 +151,13 @@ func _ready() -> void:
 	start_screen.show()
 	main_screen.hide()
 	character_screen.hide()
-	start_button.grab_focus()
+	starting_roster.slot_buttons[0].grab_focus()
 
 func show_main() -> void:
+	if award_screen.visible or work_panel.visible: return
+	if not Model.pending_recruits(state).is_empty():
+		open_recruitment()
+		return
 	if Model.needs_project_selection(state):
 		open_game_selection()
 		return
@@ -145,19 +166,30 @@ func show_main() -> void:
 	game_selection.hide()
 	main_screen.show()
 	refresh_time()
-	character_buttons[0].grab_focus()
+	var active := Model.recruited_ids(state)
+	if active.is_empty(): schedule_button.grab_focus()
+	else: character_buttons[int(active[0])].grab_focus()
 
 func start_game() -> void:
-	state = Model.fresh()
+	if starting_roster.picker.visible or not starting_roster.is_complete(): return
+	var result := Model.start_with_members(starting_roster.selected_ids)
+	if not result.ok: return
+	recruitment_panel.hide()
+	starting_roster.close_picker()
+	state = result.state
 	## 新的一局重新开始记录：调试满好感会在下次打开调试面板时重新套用。
 	debug_affinity_backup = []
 	open_game_selection()
 
 func open_game_selection() -> void:
+	if award_screen.visible or work_panel.visible: return
+	if not Model.pending_recruits(state).is_empty():
+		open_recruitment()
+		return
 	start_screen.hide()
 	main_screen.hide()
 	character_screen.hide()
-	game_selection.open(int(state.year), state.members.map(func(member: Dictionary): return int(member.affinity)))
+	game_selection.open(int(state.year), state.members.map(func(member: Dictionary): return int(member.affinity)), state.members.map(func(member: Dictionary): return bool(member.recruited)))
 
 func _select_project(title: String, genre_id: String, topic_id: String, year: int) -> void:
 	if not game_selection.visible:
@@ -186,15 +218,37 @@ func _on_award_closed() -> void:
 	refresh_time()
 	show_main()
 
+func open_recruitment() -> void:
+	if award_screen.visible or work_panel.visible: return
+	var pending := Model.pending_recruits(state)
+	if pending.is_empty():
+		open_game_selection()
+		return
+	start_screen.hide()
+	main_screen.hide()
+	character_screen.hide()
+	game_selection.hide()
+	var index := CHARACTER_IDS.find(pending[0])
+	recruitment_panel.open(Model.DEFINITIONS[index])
+
+func _confirm_recruit(character_id: String) -> void:
+	if not recruitment_panel.visible or recruitment_panel.character_id != character_id: return
+	var result := Model.confirm_recruit(state, character_id)
+	if not result.ok: return
+	state = result.state
+	recruitment_panel.hide()
+	refresh_time()
+	show_main()
+
 func open_character(character_id: String) -> void:
 	if Model.needs_project_selection(state):
 		return
-	if work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
+	if work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if duty_panel.visible:
 		duty_panel.close()
 	var member_id := CHARACTER_IDS.find(character_id)
-	if member_id < 0:
+	if not Model.is_recruited(state, member_id):
 		return
 	selected_character = character_id
 	member_sheet.display_member(state, member_id, character_id)
@@ -203,7 +257,7 @@ func open_character(character_id: String) -> void:
 	close_button.grab_focus()
 
 func close_character() -> void:
-	if task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
+	if task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.needs_project_selection(state):
 		open_game_selection()
@@ -216,7 +270,7 @@ func close_character() -> void:
 	character_buttons[maxi(0, index)].grab_focus()
 
 func _learn_skill(member_id: int, slot_index: int) -> void:
-	if task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
+	if task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	state = Model.learn(state, member_id, slot_index)
 	refresh_time()
@@ -224,12 +278,12 @@ func _learn_skill(member_id: int, slot_index: int) -> void:
 
 func open_schedule() -> void:
 	## 打开工作分配表；界面只发出调整请求，职责是否真的改变由游戏规则决定。
-	if Model.needs_project_selection(state) or work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
+	if Model.needs_project_selection(state) or work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	duty_panel.open(state)
 
 func open_tasks() -> void:
-	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
+	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
 		member_sheet.show_action_notice()
@@ -237,13 +291,13 @@ func open_tasks() -> void:
 	task_panel.open(state)
 
 func open_invite() -> void:
-	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or invite_pending or _debug_open():
+	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
 		member_sheet.show_action_notice()
 		return
 	var member_id := CHARACTER_IDS.find(selected_character)
-	if member_id < 0:
+	if not Model.is_recruited(state, member_id):
 		return
 	var year := int(state.year)
 	var month := int(state.month)
@@ -281,7 +335,7 @@ func _confirm_task(task_id: String) -> void:
 	task_execution.open(result.report)
 
 func _next_turn() -> void:
-	if not duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or invite_pending or _debug_open():
+	if not duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	var result := Model.advance_work(state, int(state.year), int(state.month))
 	if not result.ok:
@@ -291,12 +345,17 @@ func _next_turn() -> void:
 	pending_annual = result.report.get("annual", {})
 	duty_panel.close()
 	refresh_time()
-	work_panel.open(result.report)
+	if Model.recruited_ids({"members": result.report.members}).is_empty():
+		_on_work_closed()
+	else:
+		work_panel.open(result.report)
 
 func refresh_time() -> void:
 	## 主界面 HUD 统一刷新：年月、全局灵感与当前作品的四项属性。
 	time_label.text = "第%d年%d月" % [int(state.year), int(state.month)]
 	inspiration_label.text = "%s %d" % [Model.INSPIRATION.name, int(state.inspiration)]
+	for index in character_buttons.size():
+		character_buttons[index].visible = Model.is_recruited(state, index)
 	refresh_status()
 
 func refresh_status() -> void:
@@ -304,10 +363,10 @@ func refresh_status() -> void:
 	## 数值只读自模型快照，界面不参与结算。
 	var work: Dictionary = state.get("work", {})
 	project_label.text = _project_line()
-	gameplay_label.text = "游戏性 %.1f" % float(work.get("g", 0.0))
-	innovation_label.text = "创新性 %.1f" % float(work.get("i", 0.0))
-	presentation_label.text = "表现力 %.1f" % _presentation(work)
-	bug_label.text = "Bug %.1f" % float(work.get("b", 0.0))
+	gameplay_label.text = "游戏性 " + NumberDisplay.text(float(work.get("g", 0.0)))
+	innovation_label.text = "创新性 " + NumberDisplay.text(float(work.get("i", 0.0)))
+	presentation_label.text = "表现力 " + NumberDisplay.text(_presentation(work))
+	bug_label.text = "Bug " + NumberDisplay.text(float(work.get("b", 0.0)))
 
 func _project_line() -> String:
 	## 作品名字与类型题材都来自当年的作品档案。
@@ -368,7 +427,7 @@ func open_debug() -> void:
 	## 只有停在主界面、没有其他弹窗在进行时才能打开；面板打开期间不让玩法被改动。
 	if debug_panel == null or not main_screen.visible or _debug_open():
 		return
-	if duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or game_selection.visible or invite_pending:
+	if duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or game_selection.visible or invite_pending:
 		return
 	debug_panel.open(state, debug_full_affinity)
 	_apply_debug_affinity_default()

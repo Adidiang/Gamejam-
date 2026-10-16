@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 const Model = preload("res://scripts/game_model.gd")
 const SkillTable = preload("res://scripts/skills/skill_table.gd")
 const SkillDefinition = preload("res://scripts/skills/skill_definition.gd")
@@ -17,7 +18,7 @@ func _initialize() -> void:
 func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
-	var initial: Dictionary = Model.select_project(Model.fresh(), "邀约测试", "act", "modern", 1).state
+	var initial: Dictionary = Model.select_project(Roster.fresh(), "邀约测试", "act", "modern", 1).state
 	var result := Model.execute_invite(initial, 0, 1, 1)
 	check(result.ok and result.state.members[0].affinity == 10, "邀约固定提升十好感")
 	check(initial.members[0].affinity == 0 and initial.action_steps == 1, "邀约不修改输入状态")
@@ -29,7 +30,7 @@ func _run() -> void:
 	check(not Model.execute_task(result.state, 1, "art_concept", 1, 1).ok, "邀约后不能分配任务")
 	var task := Model.execute_task(initial, 0, "art_concept", 1, 1)
 	check(not Model.execute_invite(task.state, 1, 1, 1).ok, "任务后不能邀约")
-	check(not Model.execute_invite(initial, -1, 1, 1).ok and not Model.execute_invite(initial, 4, 1, 1).ok, "拒绝无效邀约成员")
+	check(not Model.execute_invite(initial, -1, 1, 1).ok and not Model.execute_invite(initial, Model.DEFINITIONS.size(), 1, 1).ok, "拒绝无效邀约成员")
 	check(not Model.execute_invite(initial, 0, 2, 1).ok and not Model.execute_invite(initial, 0, 1, 2).ok, "拒绝陈旧年月")
 	for phase in ["report", "ending"]:
 		var blocked := initial.duplicate(true)
@@ -67,7 +68,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	scene.state = Model.select_project(Model.fresh(), "邀约界面测试", "act", "modern", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "邀约界面测试", "act", "modern", 1).state
 	scene.show_main()
 	scene.open_character("a")
 	var button: Button = scene.member_sheet.invite_button

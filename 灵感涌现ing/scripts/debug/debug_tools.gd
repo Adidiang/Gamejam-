@@ -5,6 +5,7 @@ extends RefCounted
 ## 调试只替换当前状态快照，不改游戏规则：结算公式、好感上限与技能费用仍然只有一处定义。
 
 const Config = preload("res://scripts/debug/debug_config.gd")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 const Model = preload("res://scripts/game_model.gd")
 const CharacterTable = preload("res://scripts/character_table.gd")
 
@@ -88,7 +89,7 @@ static func set_full_affinity(state: Dictionary, on: bool, backup: Array) -> Dic
 	for index in next.members.size():
 		if on:
 			restored.append(int(next.members[index].affinity))
-			next.members[index].affinity = AFFINITY_MAXIMUM
+			if Model.is_recruited(next, index): next.members[index].affinity = AFFINITY_MAXIMUM
 		else:
 			var original: int = int(backup[index]) if index < backup.size() else int(next.members[index].affinity)
 			next.members[index].affinity = clampi(original, 0, AFFINITY_MAXIMUM)
@@ -101,4 +102,4 @@ static func _reject(message: String) -> Dictionary:
 	return {"ok": false, "message": message}
 
 static func _number_text(value: float) -> String:
-	return String.num(value, 1)
+	return NumberDisplay.text(value)

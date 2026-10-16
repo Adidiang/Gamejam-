@@ -21,6 +21,7 @@ var topic_id := ""
 var selection_year := 1
 ## 打开选择页时读入的好感度快照：预览要在上限内显示本次真实增益。
 var affinities: Array = []
+var recruited: Array = []
 var sidebar: PanelContainer
 var genre_grid: GridContainer
 var topic_grid: GridContainer
@@ -135,8 +136,9 @@ func _choices(parent: VBoxContainer, options: Array, buttons: Array[Button], is_
 		buttons.append(button)
 	return grid
 
-func open(year: int, current_affinities: Array = []) -> void:
+func open(year: int, current_affinities: Array = [], current_recruited: Array = []) -> void:
 	selection_year = year
+	recruited = current_recruited.duplicate()
 	affinities.clear()
 	for value in current_affinities:
 		affinities.append(int(value))
@@ -170,6 +172,7 @@ func _refresh_affinity() -> void:
 		return
 	var matched: Array[String] = []
 	for index in Model.DEFINITIONS.size():
+		if index >= recruited.size() or not recruited[index]: continue
 		var definition: Dictionary = Model.DEFINITIONS[index]
 		var genre_gain := Model.preference_bonus(index, genre_id, "")
 		var topic_gain := Model.preference_bonus(index, "", topic_id)

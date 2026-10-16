@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 通用文本确认框检查：文本作为参数、取消在左／确认在右、返回值、Esc、排队、
 ## 长文本滚动、分辨率自适应，以及打开期间不穿透到下层界面。
 
@@ -63,9 +64,12 @@ func _run() -> void:
 	check(answers.size() == 1 and answers[0] == true, "点确认返回 true")
 	check(not popup.is_open(), "选择之后关闭确认框")
 	check(not paused, "关闭后恢复下层界面")
-	check(root.gui_get_focus_owner() == scene.start_button, "关闭后焦点回到打开前的控件")
+	check(root.gui_get_focus_owner() == scene.starting_roster.slot_buttons[0], "关闭后焦点回到打开前的控件")
 
+	Roster.select_starting_pair(scene)
 	scene.start_button.pressed.emit()
+	Roster.recruit_all(scene.state)
+	scene.open_game_selection()
 	scene._select_project("确认框测试", "act", "fantasy", 1)
 	await frames(2)
 	check(scene.main_screen.visible, "进入主界面")

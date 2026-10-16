@@ -3,7 +3,13 @@
     "a",
     "b",
     "c",
-    "d"
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j"
   ],
   "characters": [
     {
@@ -33,7 +39,8 @@
         }
       ],
       "other_modifiers": "",
-      "portrait": "res://assets/portraits/a.png"
+      "portrait": "res://assets/portraits/a.png",
+      "join_text": ""
     },
     {
       "id": "b",
@@ -62,7 +69,8 @@
         }
       ],
       "other_modifiers": "",
-      "portrait": "res://assets/portraits/b.png"
+      "portrait": "res://assets/portraits/b.png",
+      "join_text": ""
     },
     {
       "id": "c",
@@ -91,7 +99,8 @@
         }
       ],
       "other_modifiers": "",
-      "portrait": "res://assets/portraits/c.png"
+      "portrait": "res://assets/portraits/c.png",
+      "join_text": ""
     },
     {
       "id": "d",
@@ -120,7 +129,188 @@
         }
       ],
       "other_modifiers": "",
-      "portrait": ""
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "e",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "e_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "e_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "e_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "f",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "f_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "f_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "f_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "g",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "g_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "g_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "g_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "h",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "h_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "h_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "h_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "i",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "i_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "i_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "i_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
+    },
+    {
+      "id": "j",
+      "name": "",
+      "attributes": {
+        "programming": 0,
+        "imagination": 0,
+        "art": 0,
+        "music": 0
+      },
+      "affinity": 0,
+      "preferred_genre": "",
+      "preferred_topic": "",
+      "skills": [
+        {
+          "skill_id": "j_skill_1",
+          "unlock_affinity": 0
+        },
+        {
+          "skill_id": "j_skill_2",
+          "unlock_affinity": 20
+        },
+        {
+          "skill_id": "j_skill_3",
+          "unlock_affinity": 50
+        }
+      ],
+      "other_modifiers": "",
+      "portrait": "",
+      "join_text": ""
     }
   ]
 }

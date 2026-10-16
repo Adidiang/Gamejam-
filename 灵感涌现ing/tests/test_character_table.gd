@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 
 const Table = preload("res://scripts/character_table.gd")
 const Model = preload("res://scripts/game_model.gd")
@@ -18,11 +19,35 @@ func _initialize() -> void:
 
 func _run() -> void:
 	check(Table.validate(Table.table).is_empty(), "Production character table is valid")
-	check(Table.initial_ids().size() == 4, "Exactly four active characters")
-	var initial := Model.fresh()
-	for index in 4:
+	check(Table.initial_ids() == ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"], "Exactly ten active characters in scene order")
+	var initial := Roster.fresh()
+	for index in Model.DEFINITIONS.size():
 		check(initial.members[index].id == Table.initial_ids()[index], "Stable ID connects initial state to table")
 		check(initial.members[index].affinity == Model.DEFINITIONS[index].affinity, "Initial affinity comes from table")
+	check(Model.valid_state(initial), "Ten-member fresh state passes save validation")
+	var last_definition: Dictionary = Model.DEFINITIONS[9].duplicate(true)
+	Model.DEFINITIONS[9].stats = [10.0, 0.0, 0.0, 0.0]
+	Model.DEFINITIONS[9].topic = "现代"
+	var expanded: Dictionary = Model.select_project(initial, "十人测试", "act", "modern", 1).state
+	check(expanded.members[9].affinity == 10, "Last member receives project preference affinity")
+	expanded = Model.assign(expanded, 9, 3)
+	check(expanded.members[9].role == 3, "Last member can change duties")
+	var expanded_turn := Model.advance_work(expanded, 1, 1)
+	check(expanded_turn.report.contributions.size() == 10 and expanded_turn.report.contributions[9].repair > 0, "Last member contributes to monthly work")
+	var invited := Model.execute_invite(expanded_turn.state, 9, 1, 2)
+	check(invited.ok and invited.state.members[9].affinity == 20, "Last member can be invited independently")
+	check(Model.valid_state(JSON.parse_string(JSON.stringify(invited.state))), "Ten-member state survives JSON save round trip")
+	var last_skill_id: String = last_definition.skills[1].skill_id
+	var last_skill = Skills.skills[last_skill_id]
+	var paid_skill = last_skill.duplicate(true)
+	paid_skill.display_name = "末位员工测试技能"
+	paid_skill.acquisition = "inspiration"
+	paid_skill.inspiration_cost = 1
+	Skills.skills[last_skill_id] = paid_skill
+	var learned := Model.learn(invited.state, 9, 1)
+	check(learned.members[9].learned_skills == [last_skill_id] and learned.members[0].learned_skills.is_empty(), "Last member learns skills independently")
+	Skills.skills[last_skill_id] = last_skill
+	Model.DEFINITIONS[9] = last_definition
 	var invalid := Table.table.duplicate(true)
 	invalid.characters[1].id = invalid.characters[0].id
 	check(not Table.validate(invalid).is_empty(), "Duplicate character ID is rejected")
@@ -76,7 +101,7 @@ func _run() -> void:
 	var original_definitions := Model.DEFINITIONS
 	Table.table = Table.load_table("res://qa/characters_fixture.json")
 	Model.DEFINITIONS = Table.definitions()
-	var state := Model.fresh()
+	var state := Roster.fresh()
 	check(state.members[0].id == extra.id, "Replacement selected by ID, independent of table row order")
 	check(Model.DEFINITIONS[0].stats == [10.0, 4.0, 6.0, 2.0], "Named attributes map in design order")
 	var sheet := Sheet.new()
@@ -94,6 +119,11 @@ func _run() -> void:
 	check(is_equal_approx(float(sheet.stat_base_values[0].text), 10.0), "Base value is the table attribute")
 	check(is_equal_approx(float(sheet.stat_final_values[0].text), 15.0), "Final value applies the one-percent affinity bonus")
 	check(sheet.stat_final_values[0].get_theme_color("font_color") == Sheet.GROWTH, "Final value uses the growth color")
+	state.members[0].ability_growth[0] = 0.9
+	var display_snapshot := state.duplicate(true)
+	sheet.display_member(state, 0, extra.id)
+	check(sheet.stat_base_values[0].text == "10" and sheet.stat_final_values[0].text == "16", "Base and final attributes independently floor their actual values")
+	check(state == display_snapshot and is_equal_approx(Model.ability(state, 0)[0], 16.35), "Member display preserves fractional growth and ability calculation")
 	check(sheet.skill_statuses[2].text.contains("50 好感度解锁") and sheet.skill_quips[0].text == fixture_skill.quip, "Threshold status refreshes with affinity")
 	Model.DEFINITIONS[0].portrait = ""
 	sheet.display_member(state, 0, extra.id)
@@ -101,13 +131,26 @@ func _run() -> void:
 	state.members[0].affinity = 30
 	state = Model.select_project(state, "偏好测试", "act", "fantasy", 1).state
 	check(state.members[0].affinity == mini(Table.AFFINITY_MAX, 30 + 2 * Model.PREFERENCE_AFFINITY), "Matched preferences raise affinity on project selection")
-	var capped := Model.fresh()
+	var capped := Roster.fresh()
 	capped.members[0].affinity = Table.AFFINITY_MAX
 	capped = Model.select_project(capped, "封顶测试", "act", "fantasy", 1).state
 	check(capped.members[0].affinity == Table.AFFINITY_MAX, "Preference bonus cannot exceed the affinity cap")
 	Table.table = original_table
 	Skills.skills = original_skills
 	Model.DEFINITIONS = original_definitions
+	var scene = load("res://scenes/interface_shell.tscn").instantiate()
+	root.add_child(scene)
+	scene.state = Model.select_project(Roster.fresh(), "十人界面", "act", "modern", 1).state
+	scene.show_main()
+	check(scene.character_buttons.size() == 10, "Main screen exposes ten editable character buttons")
+	for index in range(4, 10):
+		var button: Button = scene.character_buttons[index]
+		check(button.name == "Character" + str(Table.initial_ids()[index]).to_upper(), "New button maps to the matching scene node")
+		check(button.has_node("Portrait"), "New character reserves an editable portrait node")
+		button.pressed.emit()
+		check(scene.character_screen.visible and scene.selected_character == Table.initial_ids()[index], "New character button opens its own member page")
+		scene.close_character()
+	scene.queue_free()
 	sheet.queue_free()
 	print("CHARACTER_TABLE_TESTS: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)

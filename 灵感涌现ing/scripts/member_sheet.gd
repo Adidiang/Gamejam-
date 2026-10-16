@@ -5,6 +5,7 @@ signal task_requested
 signal invite_requested
 
 const Model = preload("res://scripts/game_model.gd")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 const CharacterTable = preload("res://scripts/character_table.gd")
 const SkillTable = preload("res://scripts/skills/skill_table.gd")
 const SkillRunner = preload("res://scripts/skills/skill_runner.gd")
@@ -216,8 +217,8 @@ func display_member(state: Dictionary, member_id: int, character_id: String) -> 
 	var base_values := Model.base_ability(member_id, state)
 	var final_values := Model.ability(state, member_id)
 	for index in stat_base_values.size():
-		stat_base_values[index].text = String.num(float(base_values[index]), 1)
-		stat_final_values[index].text = String.num(float(final_values[index]), 1)
+		stat_base_values[index].text = NumberDisplay.text(float(base_values[index]))
+		stat_final_values[index].text = NumberDisplay.text(float(final_values[index]))
 	var affinity := clampi(int(state.members[member_id].affinity), 0, CharacterTable.AFFINITY_MAX)
 	affinity_bar.value = affinity
 	affinity_label.text = "好感度    %d / %d" % [affinity, CharacterTable.AFFINITY_MAX]

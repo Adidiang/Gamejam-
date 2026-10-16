@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 
 const Model = preload("res://scripts/game_model.gd")
 const SkillFixture = preload("res://tests/fixtures/skill_fixture.gd")
@@ -22,7 +23,7 @@ func _run() -> void:
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
 	for id in 4:
 		Model.DEFINITIONS[id].stats = [10, 20, 30, 40]
-	var initial: Dictionary = Model.select_project(Model.fresh(), "工作测试", "act", "modern", 1).state
+	var initial: Dictionary = Model.select_project(Roster.fresh(), "工作测试", "act", "modern", 1).state
 	initial.members[0].role = 0
 	initial.members[1].role = 1
 	initial.members[2].role = 2
@@ -63,7 +64,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	scene.state = Model.select_project(Model.fresh(), "工作测试", "act", "modern", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "工作测试", "act", "modern", 1).state
 	for id in 4:
 		scene.state.members[id].role = id
 	scene.show_main()
@@ -91,9 +92,9 @@ func _run() -> void:
 	var saw_second_scroll := false
 	var scroll_had_complete_results := true
 	## 展示文本取自本回合真实贡献，避免写死数值；表现力列现在也会出现在成员行里。
-	var member0_line := "游戏性  +%.1f" % float(panel.report.contributions[0].g)
-	var member1_line := "表现力  +%.1f" % float(panel.report.contributions[1].p)
-	while panel.playing and Time.get_ticks_msec() - started < 15000:
+	var member0_line := "游戏性  %+d" % floori(float(panel.report.contributions[0].g))
+	var member1_line := "表现力  %+d" % floori(float(panel.report.contributions[1].p))
+	while panel.playing and Time.get_ticks_msec() - started < 35000:
 		await process_frame
 		if panel.current_member == 1:
 			if panel.animation.get_total_elapsed_time() < 0.8:
@@ -104,7 +105,7 @@ func _run() -> void:
 				scroll_had_complete_results = scroll_had_complete_results and panel.value_labels[0].text.contains(member0_line) and panel.value_labels[1].text.contains(member1_line) and is_equal_approx(panel.cards[1].modulate.a, 1.0)
 	check(saw_second_reveal and reveal_kept_scroll, "下一人的成果展示过程中保持原滚动位置")
 	check(saw_second_scroll and scroll_had_complete_results, "滚动开始时上下两人的成果都已完整显示")
-	check(not panel.playing and presented == [0, 1, 2, 3], "全员按顺序自动播放完成")
+	check(not panel.playing and presented == range(Model.DEFINITIONS.size()), "全员按顺序自动播放完成")
 	check(panel.scroll.scroll_vertical > 0, "自动滚动到后续头像")
 	check(panel.value_labels[0].text.contains(member0_line), "展示数据来自真实贡献")
 	check(not panel.finish_button.disabled, "全员完成后允许返回")
@@ -114,8 +115,24 @@ func _run() -> void:
 		for contribution in panel.report.contributions:
 			totals[key] = float(totals[key]) + float(contribution[key])
 	check(panel.summary_label.text.contains("本月总计") and not panel.summary_label.text.contains("作品累计"), "底部汇总改为本回合全员总计")
-	check(panel.summary_label.text.contains("游戏性 %+.1f" % float(totals.g)) and panel.summary_label.text.contains("表现力 %+.1f" % float(totals.p)), "总计数值来自全员贡献相加")
-	check(panel.summary_label.text.contains("修复能力 %+.1f" % float(totals.repair)) and panel.summary_label.text.contains("当前灵感 %d" % int(panel.report.inspiration)), "总计保留修复口径与灵感信息")
+	check(panel.summary_label.text.contains("游戏性 %+d" % floori(float(totals.g))) and panel.summary_label.text.contains("表现力 %+d" % floori(float(totals.p))), "总计数值来自全员贡献相加")
+	check(panel.summary_label.text.contains("修复能力 %+d" % floori(float(totals.repair))) and panel.summary_label.text.contains("当前灵感 %d" % int(panel.report.inspiration)), "总计保留修复口径与灵感信息")
+	var original_report: Dictionary = panel.report
+	panel.report = original_report.duplicate(true)
+	panel.report.contributions[0].g = 1.9
+	panel.report.contributions[0].b = -1.2
+	panel.report.contributions[1].g = 1.9
+	panel.report.contributions[2].g = 0.0
+	panel.report.contributions[3].g = 0.0
+	var display_snapshot: Dictionary = panel.report.duplicate(true)
+	panel._show_values(0.5, 0)
+	check(panel.value_labels[0].text.contains("游戏性  +0") and panel.value_labels[0].text.contains("Bug  -1"), "递增动画也向下取整，负数不出现正负号叠加")
+	panel._show_values(1.0, 0)
+	check(panel.value_labels[0].text.contains("游戏性  +1") and panel.value_labels[0].text.contains("Bug  -2"), "完整产出对正负小数都向下取整")
+	check(panel._month_summary_text().contains("游戏性 +3"), "先合计真实小数再取整，不把成员显示值相加")
+	check(panel.report == display_snapshot and scene.state == snapshot, "动画与汇总显示保留报告和模型真实数值")
+	panel.report = original_report
+	panel._show_values(1.0, 0)
 	for resolution in [Vector2i(1280, 720), Vector2i(1920, 1080)]:
 		root.size = resolution
 		for frame in 4:

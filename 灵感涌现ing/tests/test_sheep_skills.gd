@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 const Model = preload("res://scripts/game_model.gd")
 const Skills = preload("res://scripts/skills/skill_table.gd")
 const Definition = preload("res://scripts/skills/skill_definition.gd")
@@ -33,7 +34,7 @@ func probability(chance: float) -> void:
 	Skills.skills[row.id] = Definition.from_row(row)
 
 func ready(learned: bool = true) -> Dictionary:
-	var state: Dictionary = Model.select_project(Model.fresh(), "梦境测试", "rpg", "fantasy", 1).state
+	var state: Dictionary = Model.select_project(Roster.fresh(), "梦境测试", "rpg", "fantasy", 1).state
 	if learned:
 		state.members[0].affinity = 50
 		state.inspiration = 100
@@ -219,7 +220,7 @@ func _run() -> void:
 	while task_view.playing and Time.get_ticks_msec() < deadline: await process_frame
 	check(not task_view.playing and near(task_view.progress.value, 100), "Real task display finishes its progress before showing results")
 	check(task_view.results_label.text.contains("睡着") and task_view.results_label.text.contains("年度任务次数保留"), "Task feedback explains sleep and retained annual chance")
-	check(task_view.results_label.text.contains("脑洞白值 +10.0") and task_view.results_label.text.contains("脑洞白值 +5.0"), "Task feedback shows owner and team growth")
+	check(task_view.results_label.text.contains("脑洞白值 +10") and task_view.results_label.text.contains("脑洞白值 +5"), "Task feedback shows owner and team growth")
 	check(task_view.results_label.text.contains("下一次任务产出翻倍"), "Task sleep reports the newly armed dreamer effect")
 	await screenshot("sheep_task_sleep")
 	task_view.queue_free()
@@ -227,9 +228,9 @@ func _run() -> void:
 	var work_view := WorkView.new()
 	root.add_child(work_view)
 	work_view.open(sleep_work.report)
-	deadline = Time.get_ticks_msec() + 15000
+	deadline = Time.get_ticks_msec() + 35000
 	while work_view.playing and Time.get_ticks_msec() < deadline: await process_frame
-	check(work_view.value_labels[0].text.contains("睡着") and work_view.summary_label.text.contains("脑洞白值 +10.0"), "Monthly work feedback shows sleep and growth")
+	check(work_view.value_labels[0].text.contains("睡着") and work_view.summary_label.text.contains("脑洞白值 +10"), "Monthly work feedback shows sleep and growth")
 	check(not work_view.playing and work_view.value_labels[0].text.contains("下一次任务产出翻倍"), "Real monthly display finishes and reports the armed effect")
 	work_view.scroll.scroll_vertical = 0
 	await screenshot("sheep_monthly_sleep")

@@ -6,11 +6,12 @@ const Numeric = preload("res://scripts/skills/effects/numeric_modifier.gd")
 
 static func active(state: Dictionary, member_id: int, slot: Dictionary) -> bool:
 	var skill = Table.skills.get(slot.skill_id)
-	if skill == null or skill.display_name.is_empty() or int(state.members[member_id].affinity) < int(slot.unlock_affinity):
+	if not bool(state.members[member_id].get("recruited", false)) or skill == null or skill.display_name.is_empty() or int(state.members[member_id].affinity) < int(slot.unlock_affinity):
 		return false
 	return skill.acquisition == "auto" or slot.skill_id in state.members[member_id].learned_skills
 
 static func status(state: Dictionary, member_id: int, slot: Dictionary) -> Dictionary:
+	if not bool(state.members[member_id].get("recruited", false)): return {"text": "未招募", "can_learn": false, "active": false}
 	var skill = Table.skills.get(slot.skill_id)
 	if skill == null: return {"text": "技能配置缺失", "can_learn": false, "active": false}
 	var prefix := "%d 好感度解锁" % int(slot.unlock_affinity)
@@ -38,7 +39,7 @@ static func run(state: Dictionary, definitions: Array, hook: String, metadata: D
 		if int(temporary.year) != int(state.year) or (temporary.duration == "month" and int(temporary.month) != int(state.month)):
 			continue
 		retained.append(temporary)
-		if temporary.apply_hook != hook: continue
+		if temporary.apply_hook != hook or not state.members.any(func(member: Dictionary): return member.id == temporary.owner_id and bool(member.get("recruited", false))): continue
 		var context := Context.new(snapshot, base_plan, metadata, temporary.owner_id, hook)
 		var effect := Numeric.new()
 		var result = effect.evaluate(context, temporary.target, temporary.params)

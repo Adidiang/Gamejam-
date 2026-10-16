@@ -24,7 +24,7 @@ func targets(target: String) -> Array:
 	match target:
 		"owner": return [owner_id]
 		"actor": return [values.get("actor_id", "")] if not values.get("actor_id", "").is_empty() else []
-		"team": return state.members.map(func(member: Dictionary): return member.id)
+		"team": return state.members.filter(func(member: Dictionary): return bool(member.get("recruited", false))).map(func(member: Dictionary): return member.id)
 	return []
 
 func matches(conditions: Dictionary) -> bool:

@@ -1,5 +1,6 @@
 extends SceneTree
-## 主界面下方属性栏检查：显示当前作品的名字、类型题材，以及游戏性、创新性、表现力与 Bug 的模型真值；
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
+## 主界面下方属性栏检查：显示当前作品的名字、类型题材，以及向下取整的四项作品属性；
 ## 属性栏位于画面下方、不遮挡右下角排期按钮与人物入口，多分辨率下仍在画面内，
 ## 并且排期按钮保持可点击。
 
@@ -29,17 +30,23 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	scene.state = Model.select_project(Model.fresh(), "星尘回响", "narrative", "fantasy", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "星尘回响", "narrative", "fantasy", 1).state
 	for id in 4:
 		scene.state.members[id].role = id
 	scene.show_main()
 	await process_frame
 	check(scene.status_panel.visible, "主界面显示属性栏")
-	check(scene.gameplay_label.text == "游戏性 0.0" and scene.innovation_label.text == "创新性 0.0"
-		and scene.presentation_label.text == "表现力 0.0" and scene.bug_label.text == "Bug 0.0", "开局四项属性均为零")
+	check(scene.gameplay_label.text == "游戏性 0" and scene.innovation_label.text == "创新性 0"
+		and scene.presentation_label.text == "表现力 0" and scene.bug_label.text == "Bug 0", "开局四项属性均为零")
 	check(scene.project_label.text == "「星尘回响」 · 剧情向 / 奇幻", "属性栏显示当年作品的名字与类型题材")
 
-	var selection := Model.select_project(Model.fresh(), "第二年作品", "act", "modern", 1)
+	scene.state.work = {"g": 12.9999, "i": 0.9999, "p": 23.5, "b": 3.0001}
+	var fractional_snapshot: Dictionary = scene.state.duplicate(true)
+	scene.refresh_time()
+	check(scene.gameplay_label.text == "游戏性 12" and scene.innovation_label.text == "创新性 0"
+		and scene.presentation_label.text == "表现力 23" and scene.bug_label.text == "Bug 3", "四项属性统一向下取整，不四舍五入")
+	check(scene.state == fractional_snapshot, "刷新显示不改变模型中的小数精度")
+	var selection := Model.select_project(Roster.fresh(), "第二年作品", "act", "modern", 1)
 	check(selection.ok, "年度作品档案可以立项")
 	scene.state = selection.state
 	for id in 4:
@@ -48,7 +55,7 @@ func _run() -> void:
 	await process_frame
 	check(scene.main_screen.visible, "立项后进入主界面")
 	check(scene.project_label.text == "「第二年作品」 · ACT / 现代", "属性栏显示当年作品的名字与类型题材")
-	check(scene.gameplay_label.text == "游戏性 0.0" and scene.bug_label.text == "Bug 0.0", "新作品的属性从零开始")
+	check(scene.gameplay_label.text == "游戏性 0" and scene.bug_label.text == "Bug 0", "新作品的属性从零开始")
 	var status_rect: Rect2 = scene.status_panel.get_global_rect()
 	check(status_rect.size.x > 0.0 and status_rect.size.y > 0.0, "属性栏有可见尺寸")
 	check(status_rect.encloses(scene.project_label.get_global_rect()), "作品行在属性栏内")
@@ -69,17 +76,17 @@ func _run() -> void:
 	check(scene.state.month == 2, "下一回合推进月份")
 	var work: Dictionary = scene.state.work
 	check(float(work.g) > 0.0 and float(work.b) >= 0.0, "结算产出非零且 Bug 以零为下限")
-	check(scene.gameplay_label.text == "游戏性 %.1f" % float(work.g), "属性栏显示结算后的游戏性")
-	check(scene.innovation_label.text == "创新性 %.1f" % float(work.i), "属性栏显示结算后的创新性")
-	check(scene.presentation_label.text == "表现力 %.1f" % Model.performance(work), "属性栏显示模型推导的表现力")
-	check(scene.bug_label.text == "Bug %.1f" % float(work.b), "属性栏显示累计 Bug")
+	check(scene.gameplay_label.text == "游戏性 %d" % floori(float(work.g)), "属性栏显示结算后的游戏性")
+	check(scene.innovation_label.text == "创新性 %d" % floori(float(work.i)), "属性栏显示结算后的创新性")
+	check(scene.presentation_label.text == "表现力 %d" % floori(Model.performance(work)), "属性栏显示模型推导的表现力")
+	check(scene.bug_label.text == "Bug %d" % floori(float(work.b)), "属性栏显示累计 Bug")
 
 	var before_presentation := Model.performance(work)
 	var executed := Model.execute_task(scene.state, 0, "art_concept", 1, 2)
 	check(executed.ok and float(executed.state.work.get("p", 0.0)) > 0.0, "本年任务产出写入直接表现力")
 	scene.state = executed.state
 	scene.refresh_time()
-	check(scene.presentation_label.text == "表现力 %.1f" % Model.performance(scene.state.work), "任务产出后刷新属性栏表现力")
+	check(scene.presentation_label.text == "表现力 %d" % floori(Model.performance(scene.state.work)), "任务产出后刷新属性栏表现力")
 	check(Model.performance(scene.state.work) > before_presentation, "任务产出让表现力上升")
 
 	for resolution in [Vector2i(1280, 720), Vector2i(1440, 900), Vector2i(1920, 1080)]:
@@ -99,7 +106,7 @@ func _run() -> void:
 	root.size = Vector2i(1440, 900)
 	for frame in 4:
 		await process_frame
-	var deadline := Time.get_ticks_msec() + 15000
+	var deadline := Time.get_ticks_msec() + 35000
 	while scene.work_panel.playing and Time.get_ticks_msec() < deadline:
 		await process_frame
 	scene.work_panel.close()

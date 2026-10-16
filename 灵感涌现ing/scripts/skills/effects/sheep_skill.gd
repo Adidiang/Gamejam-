@@ -45,6 +45,7 @@ func evaluate(context, _target: String, params: Dictionary):
 			if context.owner_id not in context.values.get("sleeping_member_ids", []):
 				return result
 			for member in context.state.members:
+				if not bool(member.get("recruited", false)): continue
 				result.outcomes.append({"kind": "ability_add", "member_id": member.id, "stat": 1,
 					"amount": float(params.owner_gain if member.id == context.owner_id else params.others_gain)})
 		"dreamer":

@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 const Model = preload("res://scripts/game_model.gd")
 const Table = preload("res://scripts/skills/skill_table.gd")
 const Definition = preload("res://scripts/skills/skill_definition.gd")
@@ -27,7 +28,7 @@ func _run() -> void:
 			"inspiration_cost": 2 if index == 1 else 0, "triggers": []})
 	var scene = load("res://scenes/interface_shell.tscn").instantiate()
 	root.add_child(scene)
-	scene.state = Model.select_project(Model.fresh(), "技能界面测试", "act", "modern", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "技能界面测试", "act", "modern", 1).state
 	scene.state.members[0].affinity = 20
 	scene.show_main()
 	scene.character_buttons[0].pressed.emit()
@@ -53,7 +54,7 @@ func _run() -> void:
 	scene.character_buttons[1].pressed.emit()
 	check(scene.state.members[1].learned_skills.is_empty(), "Other character learning state is isolated")
 	scene.close_button.pressed.emit()
-	scene.state = Model.select_project(Model.fresh(), "技能界面测试", "act", "modern", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "技能界面测试", "act", "modern", 1).state
 	scene.state.members[0].affinity = 19
 	scene.character_buttons[0].pressed.emit()
 	check(sheet.skill_buttons[1].disabled and sheet.skill_statuses[1].text.contains("未解锁"), "Locked paid skill is disabled")

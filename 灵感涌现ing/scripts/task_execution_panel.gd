@@ -2,6 +2,7 @@ extends Control
 ## 播放已提交的结果；进度完成之前右侧保持空白。
 signal closed
 const Model = preload("res://scripts/game_model.gd")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 const Characters = preload("res://scripts/character_table.gd")
 var progress: ProgressBar
 var results_label: Label
@@ -114,7 +115,7 @@ func _show_results() -> void:
 	var names: Array = [] if invited or asleep else ["表现力", "创新性", "游戏性", "Bug"]
 	for index in keys.size():
 		if not is_zero_approx(float(report.task_delta[keys[index]])):
-			lines.append("%s %+.1f" % [names[index], report.task_delta[keys[index]]])
+			lines.append("%s %s" % [names[index], NumberDisplay.text(float(report.task_delta[keys[index]]), true)])
 	if int(report.inspiration_delta) != 0:
 		lines.append("灵感 %+d" % report.inspiration_delta)
 	for id in report.members.size():
@@ -122,7 +123,7 @@ func _show_results() -> void:
 		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
 		var imagination_gain := float(after_growth[1]) - float(before_growth[1])
 		if not is_zero_approx(imagination_gain):
-			lines.append("%s 脑洞白值 %+.1f" % [report.members[id].id, imagination_gain])
+			lines.append("%s 脑洞白值 %s" % [report.members[id].id, NumberDisplay.text(imagination_gain, true)])
 		var gain := int(report.members[id].affinity) - int(report.members_before[id].affinity)
 		if gain != 0 or (invited and id == int(report.member)):
 			lines.append("%s 好感度 %+d" % [report.members[id].id, gain])

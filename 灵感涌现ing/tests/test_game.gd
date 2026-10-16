@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 新游戏规则回归：立项、岗位结算、任务与邀约、技能、灵感、跨年与存档。
 ## 规则测试使用独立的空白人物样本，允许策划自由修改正式人物表。
 const Model = preload("res://scripts/game_model.gd")
@@ -33,7 +34,7 @@ func _init() -> void:
 		definition.topic = ""
 
 	## 1. 初始状态与立项
-	var initial := Model.fresh()
+	var initial := Roster.fresh()
 	check(Model.valid_state(initial) and Model.needs_project_selection(initial), "新游戏等待立项且可存档")
 	check(initial.work == {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}, "作品只有游戏性、创新性、表现力与 Bug")
 	check(initial.phase == "setup" and initial.action_steps == 1, "初始阶段与行动步数")
@@ -59,7 +60,7 @@ func _init() -> void:
 	check(Model.preference_bonus(0, "act", "modern") == 0, "未命中的题材不加好感")
 	Model.DEFINITIONS[0].genre = "ACT"
 	check(Model.preference_bonus(0, "act", "fantasy") == Model.PREFERENCE_AFFINITY * 2, "类型与题材同时命中各加一次")
-	var matched := Model.select_project(Model.fresh(), "偏好", "act", "fantasy", 1)
+	var matched := Model.select_project(Roster.fresh(), "偏好", "act", "fantasy", 1)
 	check(matched.state.members[0].affinity == Model.PREFERENCE_AFFINITY * 2, "立项把偏好好感写进状态")
 	check(matched.state.members[1].affinity == 0, "没有偏好的人不加好感")
 	Model.DEFINITIONS[0].genre = ""
@@ -68,7 +69,7 @@ func _init() -> void:
 	## 3. 能力两层：白值 + 好感增幅
 	for definition in Model.DEFINITIONS:
 		definition.stats = [10.0, 10.0, 10.0, 10.0]
-	var growth: Dictionary = Model.select_project(Model.fresh(), "成长", "act", "modern", 1).state
+	var growth: Dictionary = Model.select_project(Roster.fresh(), "成长", "act", "modern", 1).state
 	growth.members[0].affinity = 50
 	check(close_to(Model.base_ability(0, growth)[0], 10.0), "白值保持人物表属性")
 	check(close_to(Model.ability_bonus(growth, 0), 0.5), "每点好感提供百分之一增幅")
@@ -82,7 +83,7 @@ func _init() -> void:
 		definition.stats = [0.0, 0.0, 0.0, 0.0]
 
 	## 4. 岗位结算：零属性不产出数值，输入状态不被修改
-	var blank: Dictionary = Model.select_project(Model.fresh(), "空属性", "act", "modern", 1).state
+	var blank: Dictionary = Model.select_project(Roster.fresh(), "空属性", "act", "modern", 1).state
 	var snapshot: String = JSON.stringify(blank)
 	var settled := Model.advance_work(blank, 1, 1)
 	check(settled.ok, "准备阶段允许下一回合")
@@ -91,7 +92,7 @@ func _init() -> void:
 	check(settled.state.work == {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}, "零属性不产出作品数值")
 	check(settled.state.inspiration == Model.INSPIRATION.initial + Model.INSPIRATION.monthly_gain, "每月获得一份灵感")
 	check(not Model.advance_work(settled.state, 1, 1).ok, "旧月份请求被拒绝")
-	check(settled.report.contributions.size() == 4, "报告保留四名成员的贡献")
+	check(settled.report.contributions.size() == Model.DEFINITIONS.size(), "报告保留全员贡献")
 	check(settled.report.project.title == "空属性", "报告带当年作品档案")
 
 	## 5. 任务与邀约共用行动步数，都不推进月份
@@ -112,15 +113,15 @@ func _init() -> void:
 	check(Model.available_tasks(next_month.state).is_empty(), "当年任务次数不因跨月恢复")
 
 	## 6. 职责调整
-	var setup_state := Model.fresh()
+	var setup_state := Roster.fresh()
 	check(int(Model.assign(setup_state, 0, 3).members[0].role) == 3, "准备阶段可以调整职责")
 	check(int(setup_state.members[0].role) == 0, "调整职责不修改输入状态")
-	var finished: Dictionary = Model.select_project(Model.fresh(), "职责", "act", "modern", 1).state
+	var finished: Dictionary = Model.select_project(Roster.fresh(), "职责", "act", "modern", 1).state
 	check(int(Model.assign(finished, 0, 1).members[0].role) == 1, "立项后仍可调整职责")
 	check(Model.assign(finished, 0, 4) == finished and Model.assign(finished, -1, 0) == finished, "非法职责被拒绝")
 
 	## 7. 灵感是全局资源
-	var resource_state := Model.fresh()
+	var resource_state := Roster.fresh()
 	var earned := Model.gain_inspiration(resource_state, 7)
 	check(earned.inspiration == 9 and resource_state.inspiration == Model.INSPIRATION.initial, "灵感获得不修改输入状态")
 	var spent := Model.spend_inspiration(earned, 4)
@@ -133,14 +134,14 @@ func _init() -> void:
 	var slot_id: String = Model.DEFINITIONS[0].skills[0].skill_id
 	SkillTable.skills[slot_id] = SkillDefinition.from_row({"id": slot_id, "name": "付费测试", "description": "测试技能", "quip": "",
 		"acquisition": "inspiration", "inspiration_cost": 3, "triggers": []})
-	var poor := Model.fresh()
+	var poor := Roster.fresh()
 	check(Model.learn(poor, 0, 0) == poor, "灵感不足时不能习得")
 	poor.inspiration = 5
 	var learned := Model.learn(poor, 0, 0)
 	check(learned.inspiration == 2 and learned.members[0].learned_skills == [slot_id], "习得按配置扣费并记录")
 	check(poor.inspiration == 5 and poor.members[0].learned_skills.is_empty(), "习得不修改输入状态")
 	check(Model.learn(learned, 0, 0) == learned, "重复习得不扣费")
-	var locked := Model.fresh()
+	var locked := Roster.fresh()
 	locked.inspiration = 5
 	locked.members[0].affinity = int(Model.DEFINITIONS[0].skills[1].unlock_affinity) - 1
 	check(Model.learn(locked, 0, 1) == locked, "未达好感门槛不能习得")
@@ -150,12 +151,12 @@ func _init() -> void:
 		"acquisition": "auto", "inspiration_cost": 0, "triggers": [
 			{"hook": "PROJECT_AFTER", "conditions": {}, "target": "work", "frequency": "year",
 			"effect_id": "numeric_modifier", "params": {"field": "g", "operation": "add", "amount": 2}, "priority": 0}]})
-	var skilled := Model.select_project(Model.fresh(), "技能立项", "act", "modern", 1)
+	var skilled := Model.select_project(Roster.fresh(), "技能立项", "act", "modern", 1)
 	check(skilled.state.work.g == 2.0 and skilled.state.skill_log.size() == 1, "立项技能写入作品并留下来源记录")
 	check(not skilled.state.skill_runtime.events.is_empty(), "立项事件被记录")
 
 	## 10. 完整一年：十二月评奖、跨年清空与年度档案
-	var run: Dictionary = Model.select_project(Model.fresh(), "完整流程", "act", "modern", 1).state
+	var run: Dictionary = Model.select_project(Roster.fresh(), "完整流程", "act", "modern", 1).state
 	for month in range(1, 13):
 		var turn := Model.advance_work(run, 1, month)
 		check(turn.ok, "第 " + str(month) + " 月可以结算")

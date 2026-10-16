@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 调试功能检查：总开关关闭时不创建任何调试入口、DebugTools 全部拒绝；
 ## 作品属性修改、年内跳月（回退与跨年拒绝）、全员满好感与恢复按规则生效；
 ## 调试面板挡住身后主界面，跳月份不结算中间月份，界面显示与模型一致。
@@ -33,12 +34,13 @@ func _run() -> void:
 	quit(0 if failures == 0 else 1)
 
 func _rules() -> void:
-	var opened := Model.select_project(Model.fresh(), "调试测试", "act", "fantasy", 1)
+	var opened := Model.select_project(Roster.fresh(), "调试测试", "act", "fantasy", 1)
 	var state: Dictionary = opened.state
 
 	## 1. 作品属性：叠加、直接替换、上下限与非法输入
 	var bumped := Tools.change_work(state, "g", "add", 1200.5)
 	check(bumped.ok and close_to(float(bumped.state.work.g), 1200.5), "增加可以在当前值上叠加作品属性")
+	check(bumped.message == "游戏性：0 → 1200。", "调试反馈向下取整，实际修改仍保留小数")
 	check(close_to(float(state.work.g), 0.0), "调试不修改传进来的状态")
 	var replaced := Tools.change_work(bumped.state, "p", "set", 4000.0)
 	check(replaced.ok and close_to(float(replaced.state.work.p), 4000.0), "设为可以直接替换作品属性")
@@ -49,7 +51,7 @@ func _rules() -> void:
 	check(not Tools.change_work(state, "x", "add", 1.0).ok, "未知的作品属性被拒绝")
 	check(not Tools.change_work(state, "g", "multiply", 2.0).ok, "未知的修改方式被拒绝")
 	check(not Tools.change_work(state, "g", "add", NAN).ok, "非数字被拒绝")
-	check(not Tools.change_work(Model.fresh(), "g", "add", 1.0).ok, "本年未立项时拒绝改作品属性")
+	check(not Tools.change_work(Roster.fresh(), "g", "add", 1.0).ok, "本年未立项时拒绝改作品属性")
 
 	## 2. 时间：只允许在本年内跳到更晚的月份，跨年与回退直接拒绝
 	var jumped := Tools.jump_month(state, 12)
@@ -60,14 +62,14 @@ func _rules() -> void:
 	check(not Tools.jump_month(state, 1).ok, "跳到当前月份被拒绝")
 	check(not Tools.jump_month(jumped.state, 5).ok, "回退到更早的月份被拒绝")
 	check(not Tools.jump_month(state, 0).ok and not Tools.jump_month(state, 13).ok, "非法月份被拒绝")
-	check(not Tools.jump_month(Model.fresh(), 12).ok, "本年未立项时拒绝跳月份")
+	check(not Tools.jump_month(Roster.fresh(), 12).ok, "本年未立项时拒绝跳月份")
 	var settled := Model.advance_work(jumped.state, 1, 12)
 	check(settled.ok and settled.report.has("annual"), "跳到 12 月后可以正常结算年末评奖")
 	check(Model.valid_state(settled.state), "跳月份后的状态仍然通过正式校验")
 
 	## 3. 全员满好感：记录原始值，关闭后恢复
 	var mode := Tools.set_full_affinity(state, true, [])
-	check(mode.ok and mode.backup.size() == 4, "开启满好感时记录四个人的原始好感")
+	check(mode.ok and mode.backup.size() == Model.DEFINITIONS.size(), "开启满好感时记录全员的原始好感")
 	check(mode.backup[0] == int(state.members[0].affinity), "记录的是开启前的好感")
 	var maxed := true
 	for member in mode.state.members:
@@ -112,7 +114,10 @@ func _ui() -> void:
 	check(not scene.debug_panel.visible, "调试面板默认不显示")
 
 	## 6. 满好感默认开启，但只在打开调试面板时才套用：普通游玩不受调试影响
+	Roster.select_starting_pair(scene)
 	scene.start_game()
+	Roster.recruit_all(scene.state)
+	scene.open_game_selection()
 	await process_frame
 	check(scene.debug_full_affinity, "全员满好感默认开启")
 	check(int(scene.state.members[0].affinity) == int(Model.DEFINITIONS[0].affinity), "普通游玩沿用人物表好感")
@@ -128,19 +133,25 @@ func _ui() -> void:
 	check(int(scene.state.members[0].affinity) == Tools.AFFINITY_MAXIMUM, "打开调试面板时套用全员满好感")
 	check(scene.debug_panel.status_label.text.contains("满好感"), "面板提示满好感的套用结果")
 	check(scene.debug_panel.affinity_check.button_pressed, "满好感开关默认打开")
-	check(scene.debug_panel.work_inputs["g"].text == "0.0", "面板显示当前作品属性")
+	check(scene.debug_panel.work_inputs["g"].text == "0", "面板显示当前作品属性")
+	var fractional_state: Dictionary = scene.state.duplicate(true)
+	fractional_state.work.g = 12.9999
+	var display_snapshot: Dictionary = fractional_state.duplicate(true)
+	scene.debug_panel.show_state(fractional_state, true)
+	check(scene.debug_panel.work_inputs["g"].text == "12" and fractional_state == display_snapshot, "调试面板刷新向下取整且保留状态小数")
+	scene.debug_panel.show_state(scene.state, true)
 
 	## 8. 改作品属性：主界面同步刷新，非法输入不改数值
 	scene.debug_panel.work_inputs["g"].text = "1200"
 	scene.debug_panel.work_add_buttons["g"].pressed.emit()
 	await process_frame
 	check(close_to(float(scene.state.work.g), 1200.0), "面板可以增加游戏性")
-	check(scene.gameplay_label.text == "游戏性 1200.0", "属性栏显示调试后的游戏性")
+	check(scene.gameplay_label.text == "游戏性 1200", "属性栏显示调试后的游戏性")
 	scene.debug_panel.work_inputs["p"].text = "4000"
 	scene.debug_panel.work_set_buttons["p"].pressed.emit()
 	await process_frame
 	check(close_to(float(scene.state.work.p), 4000.0), "面板可以直接设为表现力")
-	check(scene.presentation_label.text == "表现力 4000.0", "属性栏显示调试后的表现力")
+	check(scene.presentation_label.text == "表现力 4000", "属性栏显示调试后的表现力")
 	scene.debug_panel.work_inputs["g"].text = "abc"
 	scene.debug_panel.work_add_buttons["g"].pressed.emit()
 	await process_frame
@@ -205,7 +216,7 @@ func _ui() -> void:
 	check(not scene.debug_panel.visible, "F8 再按一次关闭调试面板")
 
 	## 12. 未立项时打开面板：两条修改都被拒绝并给出原因
-	scene.state = Model.fresh()
+	scene.state = Roster.fresh()
 	scene.debug_panel.open(scene.state, scene.debug_full_affinity)
 	await process_frame
 	scene.debug_panel.work_inputs["g"].text = "10"

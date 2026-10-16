@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 技能框架测试（新游戏流程）：门槛、习得方式、四个阶段的触发、频次与评奖。
 const Model = preload("res://scripts/game_model.gd")
 const Table = preload("res://scripts/skills/skill_table.gd")
@@ -26,7 +27,7 @@ func trigger(hook: String, target: String, field: String, amount: float, operati
 func reset_fixture() -> void:
 	Model.DEFINITIONS = originals.duplicate(true)
 	Table.skills = {}
-	for member_id in 4:
+	for member_id in Model.DEFINITIONS.size():
 		var member: Dictionary = Model.DEFINITIONS[member_id]
 		member.stats = [0.0, 0.0, 0.0, 0.0]
 		member.affinity = 0
@@ -45,7 +46,7 @@ func install(member_id: int, slot_index: int, name: String, triggers: Array, acq
 
 ## 新游戏从立项开始：偏好已在 reset_fixture 里清空，立项不会附带好感。
 func start(title: String = "测试作品") -> Dictionary:
-	return Model.select_project(Model.fresh(), title, "act", "fantasy", 1).state
+	return Model.select_project(Roster.fresh(), title, "act", "fantasy", 1).state
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -75,7 +76,7 @@ func _run() -> void:
 	check(not Definition.validate(bad).is_empty(), "Duty-only member output cannot be edited in action phase")
 
 	## 2. 习得：门槛、费用与重复购买
-	var fresh := Model.fresh()
+	var fresh := Roster.fresh()
 	check(not Runner.active(fresh, 0, Model.DEFINITIONS[0].skills[0]), "Paid zero-affinity skill needs learning")
 	check(Model.learn(fresh, 0, 0) == fresh, "Insufficient inspiration is rejected")
 	fresh.inspiration = 5
@@ -88,7 +89,7 @@ func _run() -> void:
 	check(learned.members[1].learned_skills.is_empty(), "Learning is isolated per character")
 	for slot in range(1, Model.SKILL_SLOTS):
 		install(0, slot, "付费门槛", [], "inspiration", slot + 1)
-		var test := Model.fresh()
+		var test := Roster.fresh()
 		test.inspiration = 20
 		var threshold: int = Model.DEFINITIONS[0].skills[slot].unlock_affinity
 		test.members[0].affinity = threshold - 1
@@ -100,7 +101,7 @@ func _run() -> void:
 	## 3. 自动技能按好感门槛生效
 	reset_fixture()
 	install(0, 0, "自动技能", [])
-	fresh = Model.fresh()
+	fresh = Roster.fresh()
 	check(Runner.active(fresh, 0, Model.DEFINITIONS[0].skills[0]), "Skill 1 automatically active at zero affinity")
 	check(Model.learn(fresh, 0, 0) == fresh, "Automatic skill never consumes inspiration")
 	for slot in range(1, Model.SKILL_SLOTS):
@@ -113,7 +114,7 @@ func _run() -> void:
 	## 4. 立项阶段：PROJECT_BEFORE／AFTER
 	reset_fixture()
 	install(0, 0, "立项技能", [trigger("PROJECT_BEFORE", "owner", "affinity", 5), trigger("PROJECT_AFTER", "shared", "inspiration", 3), trigger("PROJECT_AFTER", "work", "g", 2)])
-	fresh = Model.fresh()
+	fresh = Roster.fresh()
 	var begun := Model.select_project(fresh, "测试", "act", "fantasy", 1)
 	check(begun.ok and begun.state.members[0].affinity == 5 and begun.state.inspiration == 5 and begun.state.work.g == 2, "Project before and after effects apply")
 	check(fresh.inspiration == 2 and fresh.members[0].affinity == 0 and fresh.skill_runtime.counts.is_empty(), "Project preview is isolated")
@@ -123,7 +124,7 @@ func _run() -> void:
 	## 5. 行动阶段：任务与邀约分开，owner 与 actor 分离
 	reset_fixture()
 	install(0, 0, "任务技能", [trigger("ACTION_BEFORE", "work", "g", 10, "add", {"action_kind": "task", "actor_is_owner": true}), trigger("ACTION_AFTER", "work", "i", 3, "add", {"action_kind": "task"})])
-	begun = Model.select_project(Model.fresh(), "任务", "act", "fantasy", 1)
+	begun = Model.select_project(Roster.fresh(), "任务", "act", "fantasy", 1)
 	var begun_state: Dictionary = begun.state
 	var snapshot := JSON.stringify(begun_state)
 	var task := Model.execute_task(begun_state, 0, "art_concept", 1, 1)
@@ -140,7 +141,7 @@ func _run() -> void:
 	## 6. 解锁时机：行动前不满门槛，行动后达标
 	reset_fixture()
 	install(0, 1, "刚解锁", [trigger("ACTION_BEFORE", "work", "g", 99), trigger("ACTION_AFTER", "work", "g", 2)])
-	begun_state = Model.select_project(Model.fresh(), "解锁时机", "act", "fantasy", 1).state
+	begun_state = Model.select_project(Roster.fresh(), "解锁时机", "act", "fantasy", 1).state
 	begun_state.members[0].affinity = 19
 	var unlocked := Model.execute_invite(begun_state, 0, 1, 1)
 	check(unlocked.state.work.g == 2 and unlocked.report.skill_events.size() == 1, "Newly unlocked auto skill applies only to later phases")
@@ -150,16 +151,16 @@ func _run() -> void:
 	install(0, 0, "全队职责", [trigger("DUTY_BEFORE", "team", "g", 1), trigger("DUTY_AFTER", "work", "b", -1)])
 	install(1, 0, "职责倍率", [trigger("DUTY_BEFORE", "team", "g", 0.5, "percent")])
 	install(2, 0, "另一倍率", [trigger("DUTY_BEFORE", "team", "g", 0.5, "percent")])
-	var duty_state: Dictionary = Model.select_project(Model.fresh(), "职责", "act", "fantasy", 1).state
+	var duty_state: Dictionary = Model.select_project(Roster.fresh(), "职责", "act", "fantasy", 1).state
 	var duty := Model.advance_work(duty_state, 1, 1)
-	check(duty.state.work.g == 8, "Team effect applied once; percentages add before multiplying")
+	check(duty.state.work.g == 2 * Model.DEFINITIONS.size(), "Team effect applied once; percentages add before multiplying")
 	check(duty.state.work.b == 0, "Bug reductions cannot create negative bugs")
 	check(duty.report.skill_events.size() == 4, "Duties collect each source once, outside member loop")
 
 	## 8. 频次：event／month／year／run
 	reset_fixture()
 	install(0, 0, "频次", [trigger("ACTION_AFTER", "shared", "inspiration", 1, "add", {}, "year")])
-	var freq_state: Dictionary = Model.select_project(Model.fresh(), "频次", "act", "fantasy", 1).state
+	var freq_state: Dictionary = Model.select_project(Roster.fresh(), "频次", "act", "fantasy", 1).state
 	var turn := Model.execute_invite(freq_state, 0, 1, 1)
 	var second := Model.execute_invite(Model.advance_work(turn.state, 1, 1).state, 0, 1, 2)
 	check(turn.report.skill_events.size() == 1 and second.report.skill_events.is_empty(), "Year-limited effect triggers once across months")
@@ -171,7 +172,7 @@ func _run() -> void:
 	for frequency in ["event", "month", "year", "run"]:
 		reset_fixture()
 		install(0, 0, "限次范围", [trigger("ACTION_AFTER", "shared", "inspiration", 1, "add", {}, frequency)])
-		freq_state = Model.select_project(Model.fresh(), "周期", "act", "fantasy", 1).state
+		freq_state = Model.select_project(Roster.fresh(), "周期", "act", "fantasy", 1).state
 		turn = Model.execute_invite(freq_state, 0, 1, 1)
 		second = Model.execute_invite(Model.advance_work(turn.state, 1, 1).state, 0, 1, 2)
 		check(second.report.skill_events.size() == (1 if frequency in ["event", "month"] else 0), "Frequency behavior across months: " + frequency)
@@ -195,18 +196,18 @@ func _run() -> void:
 	temporary.params.apply_hook = "DUTY_BEFORE"
 	temporary.params.duration = "month"
 	install(0, 0, "临时修正", [temporary])
-	freq_state = Model.select_project(Model.fresh(), "临时", "act", "fantasy", 1).state
+	freq_state = Model.select_project(Roster.fresh(), "临时", "act", "fantasy", 1).state
 	turn = Model.execute_invite(freq_state, 0, 1, 1)
 	var temp_first := Model.advance_work(turn.state, 1, 1)
 	var temp_invite := Model.execute_invite(temp_first.state, 0, 1, 2)
 	var temp_second := Model.advance_work(temp_invite.state, 1, 2)
-	check(temp_first.state.work.g == 8 and temp_second.state.work.g == 8, "Month modifier applies to later duties then expires")
+	check(temp_first.state.work.g == 2 * Model.DEFINITIONS.size() and temp_second.state.work.g == 2 * Model.DEFINITIONS.size(), "Month modifier applies to later duties then expires")
 	check(Model.valid_state(JSON.parse_string(JSON.stringify(temp_first.state))), "Temporary modifier is serializable")
 
 	## 10. 年度评奖阶段：bonus 参与判定，AWARD_AFTER 追加奖励
 	reset_fixture()
 	install(0, 0, "年度评分", [trigger("AWARD_BEFORE", "score", "bonus", 10), trigger("AWARD_AFTER", "shared", "inspiration", 4, "add", {"award_best": true})])
-	var award_state: Dictionary = Model.select_project(Model.fresh(), "评奖", "act", "fantasy", 1).state
+	var award_state: Dictionary = Model.select_project(Roster.fresh(), "评奖", "act", "fantasy", 1).state
 	award_state.month = 12
 	award_state.work = {"g": 6000.0, "i": 4000.0, "p": 4000.0, "b": 0.0}
 	var awarded := Model.advance_work(award_state, 1, 12)
@@ -217,7 +218,7 @@ func _run() -> void:
 	check(Model.valid_state(JSON.parse_string(JSON.stringify(awarded.state))), "Award skill report validates")
 	reset_fixture()
 	install(0, 0, "仅提名", [trigger("AWARD_BEFORE", "score", "bonus", 10)])
-	var edge: Dictionary = Model.select_project(Model.fresh(), "边缘", "act", "fantasy", 1).state
+	var edge: Dictionary = Model.select_project(Roster.fresh(), "边缘", "act", "fantasy", 1).state
 	edge.month = 12
 	edge.work = {"g": 1000.0, "i": 1000.0, "p": 995.0, "b": 0.0}
 	var edge_result := Model.advance_work(edge, 1, 12)

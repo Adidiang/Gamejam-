@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 const Model = preload("res://scripts/game_model.gd")
 const SkillFixture = preload("res://tests/fixtures/skill_fixture.gd")
 const SkillTable = preload("res://scripts/skills/skill_table.gd")
@@ -27,7 +28,7 @@ func _run() -> void:
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
 	Model.DEFINITIONS[0].stats = [10, 20, 30, 40]
-	var initial: Dictionary = Model.select_project(Model.fresh(), "任务检查", "act", "modern", 1).state
+	var initial: Dictionary = Model.select_project(Roster.fresh(), "任务检查", "act", "modern", 1).state
 	var factor := Model.task_output_factor(initial, 0, "art_concept")
 	var result := Model.execute_task(initial, 0, "art_concept", 1, 1)
 	check(result.ok, "无前置任务可直接执行")
@@ -45,7 +46,7 @@ func _run() -> void:
 	check(not Model.execute_task(exhausted, 0, "art_concept", 1, 1).ok and exhausted.work.i == 0, "无步数时模型直接拒绝未做过的任务")
 	var advanced := Model.advance_work(result.state, 1, 1)
 	check(advanced.ok and advanced.state.month == 2 and advanced.state.action_steps == 1 and advanced.state.inspiration == 3, "排期推进月份、获得灵感并恢复步数")
-	check(advanced.report.contributions.size() == 4 and is_equal_approx(advanced.report.work.g, 17.0 * Model.duty_output_factor(result.state, 0)), "职责仅在排期结算一次")
+	check(advanced.report.contributions.size() == Model.DEFINITIONS.size() and is_equal_approx(advanced.report.work.g, 17.0 * Model.duty_output_factor(result.state, 0)), "职责仅在排期结算一次")
 	check(Model.available_tasks(advanced.state).is_empty(), "步数恢复不改变年度已完成任务记录")
 	var skipped := Model.advance_work(initial, 1, 1)
 	check(skipped.ok and skipped.state.action_steps == 1, "未行动也可推进月份，步数不累计")
@@ -93,7 +94,7 @@ func _run() -> void:
 	check(not Model.execute_task(initial, 0, "art_concept", 1, 12).ok, "报告阶段不能执行任务")
 	Model.DEFINITIONS = definitions
 	# 使用正式属性的基础产出作对照，避免假设人物表始终为零能力。
-	var baseline: Dictionary = Model.select_project(Model.fresh(), "任务对照", "act", "modern", 1).state
+	var baseline: Dictionary = Model.select_project(Roster.fresh(), "任务对照", "act", "modern", 1).state
 	var base_task := Model.execute_task(baseline, 0, "art_concept", 1, 1)
 	var base_factor := Model.task_output_factor(baseline, 0, "art_concept")
 	var slot_id: String = Model.DEFINITIONS[0].skills[0].skill_id
@@ -106,7 +107,7 @@ func _run() -> void:
 			"effect_id": "numeric_modifier", "params": {"field": "affinity", "operation": "add", "amount": 2}, "priority": 0}]}
 	check(SkillDefinition.validate(skill_row).is_empty(), "任务技能配置合法")
 	SkillTable.skills[slot_id] = SkillDefinition.from_row(skill_row)
-	var matched: Dictionary = Model.select_project(Model.fresh(), "任务技能", "act", "modern", 1).state
+	var matched: Dictionary = Model.select_project(Roster.fresh(), "任务技能", "act", "modern", 1).state
 	result = Model.execute_task(matched, 0, "art_concept", 1, 1)
 	# 转换单元在 ACTION_BEFORE 之前，对比时先把基础产出还原到同系数基准再加技能加成。
 	var expected_i: float = base_task.report.task_delta.i / base_factor * Model.task_output_factor(matched, 0, "art_concept") + 5.0
@@ -117,7 +118,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	scene.state = Model.select_project(Model.fresh(), "任务界面测试", "act", "modern", 1).state
+	scene.state = Model.select_project(Roster.fresh(), "任务界面测试", "act", "modern", 1).state
 	scene.show_main()
 	scene.open_character("a")
 	await click(scene.member_sheet.task_button.get_global_rect().get_center())
@@ -154,6 +155,16 @@ func _run() -> void:
 	check(not execution.playing and execution.progress.value == 100 and execution.results_label.text.contains("表现力"), "一秒后展示任务结果")
 	check(not execution.results_label.text.contains("全员职责") and not execution.results_label.text.contains("灵感") and not execution.results_label.text.contains("游戏性"), "只展示任务产出，不展示职责或月灵感")
 	check(Time.get_ticks_msec() - elapsed >= 900 and not execution.finish_button.disabled, "进度持续约一秒")
+	var original_report: Dictionary = execution.report
+	execution.report = original_report.duplicate(true)
+	execution.report.task_delta = {"p": 1.9999, "i": 0.9999, "g": 0.0, "b": -1.2}
+	var display_snapshot: Dictionary = execution.report.duplicate(true)
+	var state_snapshot: Dictionary = scene.state.duplicate(true)
+	execution._show_results()
+	check(execution.results_label.text.contains("表现力 +1\n创新性 +0\nBug -2"), "任务结果对正负小数统一向下取整")
+	check(execution.report == display_snapshot and scene.state == state_snapshot, "任务结果显示不修改报告或模型数值")
+	execution.report = original_report
+	execution._show_results()
 	if DisplayServer.get_name() != "headless":
 		await process_frame
 		root.get_texture().get_image().save_png("res://qa/task_results.png")

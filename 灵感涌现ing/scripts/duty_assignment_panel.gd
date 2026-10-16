@@ -33,7 +33,7 @@ var next_turn_button: Button
 var slot_titles: Array[Label] = []
 var slot_boxes: Array[Panel] = []
 var tokens: Array = []
-var role_of_token: Array[int] = [0, 0, 0, 0]
+var role_of_token: Array[int] = []
 
 var _board: Control
 var _token_layer: Control
@@ -92,6 +92,7 @@ func apply_state(state: Dictionary, relayout: bool) -> void:
 		push_warning("工作分配表收到的人物数量与界面不一致，已保持原有分工。")
 		return
 	for index in tokens.size():
+		tokens[index].visible = Model.is_recruited(state, index)
 		role_of_token[index] = clampi(int(state.members[index].role), 0, Model.ROLES.size() - 1)
 	if relayout:
 		_layout_tokens()
@@ -183,6 +184,7 @@ func _build_tokens() -> void:
 		_token_layer.add_child(token)
 		token.setup(index, definition.id, "%s · %s" % [definition.id, definition.name])
 		tokens.append(token)
+		role_of_token.append(0)
 
 func _layout_tokens() -> void:
 	## 按当前职责把圆形排进对应方框；同一职责多人时用网格错开。
@@ -190,6 +192,7 @@ func _layout_tokens() -> void:
 		return
 	var groups: Array = [[], [], [], []]
 	for token in tokens:
+		if not token.visible: continue
 		groups[role_of_token[token.member_id]].append(token)
 	for role in slot_boxes.size():
 		var rect := slot_boxes[role].get_global_rect()

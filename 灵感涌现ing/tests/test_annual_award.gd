@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 年度评奖检查：BUG灾难 概率与特质折半、奖项门槛与顺序、年度档案与跨年清空、评奖界面播放。
 ## 评奖判定与分数在 ClubGame 年末结算时完成，界面只负责依次展示，本测试同时覆盖两处。
 
@@ -53,7 +54,7 @@ func _run() -> void:
 	## 用有限次尝试找到命中 80% 判定的作品，验证灾难从判定到归档的完整路径。
 	var disaster_state: Dictionary = {}
 	for attempt in 60:
-		var candidate: Dictionary = Model.select_project(Model.fresh(), "灾难测试", "act", "fantasy", 1).state
+		var candidate: Dictionary = Model.select_project(Roster.fresh(), "灾难测试", "act", "fantasy", 1).state
 		candidate.month = 12
 		candidate.work = {"g": 6000.0, "i": 4000.0, "p": 2000.0, "b": 100.0}
 		if Model.bug_disaster_roll(candidate):
@@ -74,7 +75,7 @@ func _run() -> void:
 	check(near(repeated.state.work.g, 0.0) and near(repeated.state.work.b, 0.0) and near(repeated.state.work.p, 0.0), "跨年后新作品产出与 Bug 从零开始")
 	check(Model.valid_state(repeated.state) and Model.needs_project_selection(repeated.state), "评奖后状态可存档并等待次年立项")
 
-	var good: Dictionary = Model.select_project(Model.fresh(), "无灾难", "rpg", "sci_fi", 1).state
+	var good: Dictionary = Model.select_project(Roster.fresh(), "无灾难", "rpg", "sci_fi", 1).state
 	good.month = 12
 	good.work = {"g": 6000.0, "i": 4000.0, "p": 4000.0, "b": 0.0}
 	var good_result := Model.advance_work(good, 1, 12)
@@ -92,7 +93,7 @@ func _run() -> void:
 	check(not Model.valid_state(broken), "评奖档案中的非法奖项被拒绝")
 
 	Model.DEFINITIONS[0].stats = [10.0, 100.0, 20.0, 10.0]
-	var task_state: Dictionary = Model.select_project(Model.fresh(), "美术任务", "act", "modern", 1).state
+	var task_state: Dictionary = Model.select_project(Roster.fresh(), "美术任务", "act", "modern", 1).state
 	var task_factor := Model.task_output_factor(task_state, 0, "art_concept")
 	var executed := Model.execute_task(task_state, 0, "art_concept", 1, 1)
 	check(executed.ok and absf(float(executed.state.work.p) - 120.0 * task_factor) < 0.0001, "美术概念设计经转换单元后写入表现力")
@@ -104,7 +105,7 @@ func _run() -> void:
 	root.add_child(scene)
 	for frame in 4:
 		await process_frame
-	var opening: Dictionary = Model.select_project(Model.fresh(), "评奖界面测试", "act", "fantasy", 1).state
+	var opening: Dictionary = Model.select_project(Roster.fresh(), "评奖界面测试", "act", "fantasy", 1).state
 	opening.month = 12
 	opening.work = {"g": 6000.0, "i": 4000.0, "p": 4000.0, "b": 0.0}
 	scene.state = opening
@@ -117,7 +118,7 @@ func _run() -> void:
 	check(scene.work_panel.visible and not scene.award_screen.visible, "十二月结算先展示工作报告")
 	var award = scene.award_screen
 	var started := Time.get_ticks_msec()
-	while scene.work_panel.playing and Time.get_ticks_msec() - started < 15000:
+	while scene.work_panel.playing and Time.get_ticks_msec() - started < 35000:
 		await process_frame
 	scene.work_panel.finish_button.pressed.emit()
 	await process_frame

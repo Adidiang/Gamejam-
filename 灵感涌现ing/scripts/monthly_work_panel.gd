@@ -5,6 +5,7 @@ signal closed
 signal member_presented(member_id: int)
 
 const Model = preload("res://scripts/game_model.gd")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 const CharacterTable = preload("res://scripts/character_table.gd")
 const PAPER := Color("fffdf7")
 const INK := Color("203e42")
@@ -22,6 +23,7 @@ var finish_button: Button
 var cards: Array[PanelContainer] = []
 var value_labels: Array[Label] = []
 var report: Dictionary = {}
+var active_members: Array = []
 var current_member := -1
 var playing := false
 var animation: Tween
@@ -126,20 +128,27 @@ func open(work_report: Dictionary) -> void:
 	playing = true
 	finish_button.disabled = true
 	scroll.scroll_vertical = 0
+	active_members = Model.recruited_ids({"members": report.members})
 	for id in cards.size():
+		cards[id].visible = id in active_members
 		cards[id].modulate = Color(1, 1, 1, 0.45)
 		value_labels[id].text = "等待工作…"
 		var role_label := cards[id].find_child("Role", true, false) as Label
 		role_label.text = Model.ROLES[int(report.members[id].role)]
+	if active_members.is_empty():
+		playing = false
+		hide()
+		closed.emit()
+		return
 	show()
 	finish_button.release_focus()
-	_play_member.call_deferred(0)
+	_play_member.call_deferred(int(active_members[0]))
 
 func _play_member(id: int) -> void:
 	if not visible or not playing:
 		return
 	current_member = id
-	progress_label.text = "正在展示 %d / %d · %s" % [id + 1, cards.size(), Model.DEFINITIONS[id].id]
+	progress_label.text = "正在展示 %d / %d · %s" % [active_members.find(id) + 1, active_members.size(), Model.DEFINITIONS[id].id]
 	member_presented.emit(id)
 	animation = create_tween()
 	var target := mini(roundi(cards[id].position.y), maxi(0, roundi(member_list.size.y - scroll.size.y)))
@@ -148,8 +157,9 @@ func _play_member(id: int) -> void:
 	animation.parallel().tween_property(cards[id], "modulate:a", 1.0, 0.4)
 	animation.tween_property(scroll, "scroll_vertical", target, 0.4).set_trans(Tween.TRANS_SINE)
 	animation.tween_interval(0.375)
-	if id + 1 < cards.size():
-		animation.tween_callback(_play_member.bind(id + 1))
+	var next_index := active_members.find(id) + 1
+	if next_index < active_members.size():
+		animation.tween_callback(_play_member.bind(int(active_members[next_index])))
 	else:
 		animation.tween_callback(_finish)
 
@@ -167,7 +177,7 @@ func _show_values(fraction: float, id: int) -> void:
 		return
 	var lines: Array[String] = []
 	for index in KEYS.size():
-		lines.append("%s  +%.1f" % [CAPTIONS[index], float(contribution[KEYS[index]]) * fraction])
+		lines.append("%s  %s" % [CAPTIONS[index], NumberDisplay.text(float(contribution[KEYS[index]]) * fraction, true)])
 	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3, 5))
 
 ## 底部汇总只看本回合全员岗位产出的合计，不显示作品累计（累计值在主界面属性栏）。
@@ -175,7 +185,7 @@ func _month_summary_text() -> String:
 	var totals := _month_totals()
 	var lines: Array[String] = []
 	for index in KEYS.size():
-		lines.append("%s %+.1f" % [CAPTIONS[index], float(totals[KEYS[index]])])
+		lines.append("%s %s" % [CAPTIONS[index], NumberDisplay.text(float(totals[KEYS[index]]), true)])
 	var head := "本月总计：" + "   ·   ".join(lines.slice(0, 3))
 	var tail := "   ·   ".join(lines.slice(3, 5))
 	return "%s\n%s   ·   本轮灵感 %+d   ·   当前灵感 %d" % [head, tail, report.inspiration_delta, report.inspiration]
@@ -192,14 +202,14 @@ func _month_totals() -> Dictionary:
 
 func _finish() -> void:
 	playing = false
-	progress_label.text = "全员工作完成 · %d / %d" % [cards.size(), cards.size()]
+	progress_label.text = "全员工作完成 · %d / %d" % [active_members.size(), active_members.size()]
 	summary_label.text = _month_summary_text()
 	var growth_messages: Array[String] = []
 	for id in report.members.size():
 		var before_growth: Array = report.get("members_before", report.members)[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
 		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
 		var gain := float(after_growth[1]) - float(before_growth[1])
-		if not is_zero_approx(gain): growth_messages.append("%s 脑洞白值 %+.1f" % [report.members[id].id, gain])
+		if not is_zero_approx(gain): growth_messages.append("%s 脑洞白值 %s" % [report.members[id].id, NumberDisplay.text(gain, true)])
 	if not growth_messages.is_empty(): summary_label.text += "\n" + " · ".join(growth_messages)
 	finish_button.disabled = false
 	finish_button.grab_focus()

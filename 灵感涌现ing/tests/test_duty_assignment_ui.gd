@@ -1,4 +1,5 @@
 extends SceneTree
+const Roster = preload("res://tests/fixtures/roster_fixture.gd")
 ## 工作分配表界面检查：真实鼠标事件驱动的拖动与“点击拿起再点击放下”、圆心落点判定、
 ## 无效落点回退、阶段限制、以及不同分辨率下的布局。
 
@@ -34,10 +35,13 @@ func _run() -> void:
 	scene.state.month = 12
 	scene.refresh_time()
 	check(scene.time_label.text == "第3年12月", "时间跟随游戏状态，而不是系统时间")
-	scene.state = Model.fresh()
+	scene.state = Roster.fresh()
 	scene.refresh_time()
 	check(scene.time_label.text == "第1年1月", "重新开局后时间回到第一年一月")
+	Roster.select_starting_pair(scene)
 	scene.start_button.pressed.emit()
+	Roster.recruit_all(scene.state)
+	scene.open_game_selection()
 	scene._select_project("职责测试", "act", "fantasy", 1)
 	await process_frame
 
@@ -53,13 +57,13 @@ func _run() -> void:
 	check(not dialog_rect.has_point(Vector2(20.0, 20.0)), "界面外仍然留有主界面区域")
 	for frame in 3:
 		await process_frame
-	check(panel.slot_boxes.size() == 4 and panel.tokens.size() == 4, "四个职责方框，每位角色一个圆形")
+	check(panel.slot_boxes.size() == 4 and panel.tokens.size() == Model.DEFINITIONS.size(), "四个职责方框，每位角色一个圆形")
 	var titles: Array = []
 	for index in 4:
 		titles.append(panel.slot_titles[index].text)
 		check(panel.slot_titles[index].get_global_rect().end.y <= panel.slot_boxes[index].get_global_rect().position.y + 0.5, "职责名称显示在方框上方")
 	check(titles == Model.ROLES, "方框上方的名称就是四项职责")
-	for index in 4:
+	for index in Model.DEFINITIONS.size():
 		check(inside(panel.tokens[index], panel.slot_boxes[int(scene.state.members[index].role)]), "圆形按当前职责落在对应方框内")
 
 	var token_a = panel.tokens[0]
@@ -105,7 +109,7 @@ func _run() -> void:
 	check(panel.visible, "可以再次打开职责调整界面")
 	for frame in 3:
 		await process_frame
-	for index in 4:
+	for index in Model.DEFINITIONS.size():
 		check(panel.role_of_token[index] == int(scene.state.members[index].role), "重新打开后界面读取真实职责")
 		check(inside(panel.tokens[index], panel.slot_boxes[int(scene.state.members[index].role)]), "重新打开后圆形回到所属方框内")
 
@@ -147,7 +151,7 @@ func _run() -> void:
 		check(scene.get_global_rect().encloses(rect), "职责调整界面不超出视口 %s" % dimensions)
 		check(rect.size.x < scene.size.x and rect.size.y < scene.size.y, "各分辨率下界面都不占满全屏 %s" % dimensions)
 		check(not rect.has_point(Vector2(20.0, 20.0)), "各分辨率下界面外仍可点击主界面 %s" % dimensions)
-		for index in 4:
+		for index in Model.DEFINITIONS.size():
 			check(inside(panel.tokens[index], panel.slot_boxes[int(scene.state.members[index].role)]), "各分辨率下圆形仍在所属方框内 %s" % dimensions)
 
 	scene.queue_free()

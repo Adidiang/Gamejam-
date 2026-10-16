@@ -23,13 +23,13 @@ static func load_table(path: String) -> Dictionary:
 static func validate(value: Variant) -> String:
 	if not value is Dictionary or not value.has_all(["initial_members", "characters"]):
 		return "需要 initial_members 和 characters。"
-	if not value.initial_members is Array or value.initial_members.size() != 4 or not value.characters is Array:
-		return "initial_members 必须指定四名在岗人物，characters 必须为数组。"
+	if not value.initial_members is Array or value.initial_members.is_empty() or not value.characters is Array:
+		return "initial_members 必须指定至少一名可用人物，characters 必须为数组。"
 	var ids: Array = []
 	for row in value.characters:
-		if not row is Dictionary or not row.has_all(["id", "name", "attributes", "affinity", "preferred_genre", "preferred_topic", "skills", "other_modifiers", "portrait"]):
+		if not row is Dictionary or not row.has_all(["id", "name", "attributes", "affinity", "preferred_genre", "preferred_topic", "skills", "other_modifiers", "portrait", "join_text"]):
 			return "人物记录缺少必填字段。"
-		for key in ["id", "name", "preferred_genre", "preferred_topic", "other_modifiers", "portrait"]:
+		for key in ["id", "name", "preferred_genre", "preferred_topic", "other_modifiers", "portrait", "join_text"]:
 			if not row[key] is String:
 				return "字段 %s 必须为文本。" % key
 		if row.id.is_empty() or row.id in ids:
@@ -76,7 +76,7 @@ static func definitions() -> Array:
 			result.append({"id": id, "name": row.name if not row.name.is_empty() else "人物" + id,
 				"stats": stats, "affinity": int(row.affinity), "genre": row.preferred_genre,
 				"topic": row.preferred_topic, "skills": row.skills.duplicate(true),
-				"other_modifiers": row.other_modifiers, "portrait": row.portrait})
+				"other_modifiers": row.other_modifiers, "portrait": row.portrait, "join_text": row.join_text})
 	return result
 
 static func portrait_texture(path: String) -> Texture2D:

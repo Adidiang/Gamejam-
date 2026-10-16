@@ -193,6 +193,168 @@
       "acquisition": "auto",
       "inspiration_cost": 0,
       "triggers": []
+    },
+    {
+      "id": "e_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "e_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "e_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "f_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "f_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "f_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "g_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "g_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "g_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "h_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "h_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "h_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "i_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "i_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "i_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "j_skill_1",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "j_skill_2",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
+    },
+    {
+      "id": "j_skill_3",
+      "name": "",
+      "description": "",
+      "quip": "",
+      "acquisition": "auto",
+      "inspiration_cost": 0,
+      "triggers": []
     }
   ]
 }

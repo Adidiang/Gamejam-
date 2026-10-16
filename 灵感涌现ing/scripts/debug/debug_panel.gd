@@ -10,6 +10,7 @@ signal month_requested(month: int)
 signal affinity_requested(on: bool)
 
 const Tools = preload("res://scripts/debug/debug_tools.gd")
+const NumberDisplay = preload("res://scripts/number_display.gd")
 
 const PAPER := Color("fffdf7")
 const INK := Color("203e42")
@@ -72,11 +73,11 @@ func open(state: Dictionary, full_affinity: bool) -> void:
 	month_input.grab_focus()
 
 func show_state(state: Dictionary, full_affinity: bool) -> void:
-	## 用真实状态刷新面板：属性输入框显示当前值，年月与好感开关显示当前模式。
+	## 属性输入框按统一规则显示当前值；只格式化文字，不修改真实状态。
 	var values := Tools.work_values(state)
 	for key in Tools.WORK_KEYS:
 		if work_inputs.has(key):
-			(work_inputs[key] as LineEdit).text = String.num(float(values[key]), 1)
+			(work_inputs[key] as LineEdit).text = NumberDisplay.text(float(values[key]))
 	year_label.text = "第 %d 年" % int(state.year)
 	month_input.placeholder_text = "当前 %d 月" % int(state.month)
 	# 用 no_signal 版本回填，避免刷新显示时又触发一次开关请求。
