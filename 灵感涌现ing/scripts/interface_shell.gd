@@ -16,6 +16,7 @@ const GameSelection = preload("res://scripts/game_selection_screen.gd")
 const StartingRoster = preload("res://scripts/starting_roster.gd")
 const RecruitmentPanel = preload("res://scripts/recruitment_panel.gd")
 const AnnualAward = preload("res://scripts/annual_award_screen.gd")
+const SettlementScreen = preload("res://scripts/settlement_screen.gd")
 const DebugTools = preload("res://scripts/debug/debug_tools.gd")
 const DebugPanel = preload("res://scripts/debug/debug_panel.gd")
 static var CHARACTER_IDS: Array = CharacterTable.initial_ids()
@@ -69,6 +70,7 @@ var game_selection: Control
 ## 十二月结算得到的年度评奖结果；工作展示确认后交给评奖界面播放。
 var pending_annual: Dictionary = {}
 var award_screen: Control
+var settlement_screen: Control
 var recruitment_panel: Control
 ## 调试：面板只在 DebugTools.enabled() 时创建；满好感默认开启，随时可以在面板里关掉。
 var debug_button: Button
@@ -128,6 +130,10 @@ func _ready() -> void:
 	award_screen.name = "AnnualAwardScreen"
 	add_child(award_screen)
 	award_screen.closed.connect(_on_award_closed)
+	settlement_screen = SettlementScreen.new()
+	settlement_screen.name = "SettlementScreen"
+	add_child(settlement_screen)
+	settlement_screen.return_requested.connect(_return_to_start)
 	recruitment_panel = RecruitmentPanel.new()
 	recruitment_panel.name = "RecruitmentPanel"
 	add_child(recruitment_panel)
@@ -155,6 +161,9 @@ func _ready() -> void:
 
 func show_main() -> void:
 	if award_screen.visible or work_panel.visible: return
+	if Model.is_finished(state):
+		open_settlement()
+		return
 	if not Model.pending_recruits(state).is_empty():
 		open_recruitment()
 		return
@@ -183,6 +192,9 @@ func start_game() -> void:
 
 func open_game_selection() -> void:
 	if award_screen.visible or work_panel.visible: return
+	if Model.is_finished(state):
+		open_settlement()
+		return
 	if not Model.pending_recruits(state).is_empty():
 		open_recruitment()
 		return
@@ -214,12 +226,36 @@ func _on_work_closed() -> void:
 		schedule_button.grab_focus()
 
 func _on_award_closed() -> void:
-	## 评奖结束后再去下一年的游戏选择页；show_main 会在待选择时自动跳转。
+	## 第三年进入两页结算；前两年继续招募与立项。
 	refresh_time()
 	show_main()
 
+func open_settlement() -> void:
+	if not Model.is_finished(state) or award_screen.visible or work_panel.visible: return
+	start_screen.hide()
+	main_screen.hide()
+	character_screen.hide()
+	game_selection.hide()
+	recruitment_panel.hide()
+	duty_panel.hide()
+	settlement_screen.open(state)
+
+func _return_to_start() -> void:
+	if not settlement_screen.visible: return
+	settlement_screen.hide()
+	state = Model.fresh()
+	pending_annual = {}
+	selected_character = ""
+	debug_affinity_backup = []
+	refresh_time()
+	start_screen.show()
+	starting_roster.slot_buttons[0].grab_focus()
+
 func open_recruitment() -> void:
 	if award_screen.visible or work_panel.visible: return
+	if Model.is_finished(state):
+		open_settlement()
+		return
 	var pending := Model.pending_recruits(state)
 	if pending.is_empty():
 		open_game_selection()
@@ -241,6 +277,7 @@ func _confirm_recruit(character_id: String) -> void:
 	show_main()
 
 func open_character(character_id: String) -> void:
+	if Model.is_finished(state): return
 	if Model.needs_project_selection(state):
 		return
 	if work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
@@ -257,6 +294,7 @@ func open_character(character_id: String) -> void:
 	close_button.grab_focus()
 
 func close_character() -> void:
+	if Model.is_finished(state): return
 	if task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.needs_project_selection(state):
@@ -270,6 +308,7 @@ func close_character() -> void:
 	character_buttons[maxi(0, index)].grab_focus()
 
 func _learn_skill(member_id: int, slot_index: int) -> void:
+	if Model.is_finished(state): return
 	if task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	state = Model.learn(state, member_id, slot_index)
@@ -277,12 +316,14 @@ func _learn_skill(member_id: int, slot_index: int) -> void:
 	member_sheet.display_member(state, member_id, CHARACTER_IDS[member_id])
 
 func open_schedule() -> void:
+	if Model.is_finished(state): return
 	## 打开工作分配表；界面只发出调整请求，职责是否真的改变由游戏规则决定。
 	if Model.needs_project_selection(state) or work_panel.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	duty_panel.open(state)
 
 func open_tasks() -> void:
+	if Model.is_finished(state): return
 	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
@@ -291,6 +332,7 @@ func open_tasks() -> void:
 	task_panel.open(state)
 
 func open_invite() -> void:
+	if Model.is_finished(state): return
 	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	if Model.action_steps(state) <= 0:
@@ -335,6 +377,7 @@ func _confirm_task(task_id: String) -> void:
 	task_execution.open(result.report)
 
 func _next_turn() -> void:
+	if Model.is_finished(state): return
 	if not duty_panel.visible or work_panel.visible or task_panel.visible or task_execution.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
 	var result := Model.advance_work(state, int(state.year), int(state.month))
@@ -424,6 +467,7 @@ func _build_debug_tools() -> void:
 	debug_panel.affinity_requested.connect(_set_debug_affinity)
 
 func open_debug() -> void:
+	if Model.is_finished(state): return
 	## 只有停在主界面、没有其他弹窗在进行时才能打开；面板打开期间不让玩法被改动。
 	if debug_panel == null or not main_screen.visible or _debug_open():
 		return

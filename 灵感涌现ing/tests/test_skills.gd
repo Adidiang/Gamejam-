@@ -77,6 +77,7 @@ func _run() -> void:
 
 	## 2. 习得：门槛、费用与重复购买
 	var fresh := Roster.fresh()
+	fresh.inspiration = 2
 	check(not Runner.active(fresh, 0, Model.DEFINITIONS[0].skills[0]), "Paid zero-affinity skill needs learning")
 	check(Model.learn(fresh, 0, 0) == fresh, "Insufficient inspiration is rejected")
 	fresh.inspiration = 5
@@ -116,8 +117,8 @@ func _run() -> void:
 	install(0, 0, "立项技能", [trigger("PROJECT_BEFORE", "owner", "affinity", 5), trigger("PROJECT_AFTER", "shared", "inspiration", 3), trigger("PROJECT_AFTER", "work", "g", 2)])
 	fresh = Roster.fresh()
 	var begun := Model.select_project(fresh, "测试", "act", "fantasy", 1)
-	check(begun.ok and begun.state.members[0].affinity == 5 and begun.state.inspiration == 5 and begun.state.work.g == 2, "Project before and after effects apply")
-	check(fresh.inspiration == 2 and fresh.members[0].affinity == 0 and fresh.skill_runtime.counts.is_empty(), "Project preview is isolated")
+	check(begun.ok and begun.state.members[0].affinity == 5 and begun.state.inspiration == 13 and begun.state.work.g == 2, "Project before and after effects apply")
+	check(fresh.inspiration == 10 and fresh.members[0].affinity == 0 and fresh.skill_runtime.counts.is_empty(), "Project preview is isolated")
 	check(begun.state.skill_log.size() == 3, "Project effects emit source records")
 	check(not Model.select_project(begun.state, "重复", "act", "fantasy", 1).ok, "Project effects cannot be submitted twice")
 

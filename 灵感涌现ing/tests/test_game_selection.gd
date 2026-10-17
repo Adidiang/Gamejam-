@@ -69,13 +69,14 @@ func _run() -> void:
 	for year in [2, 3]:
 		state.month = 12
 		state = Model.advance_work(state, year, 12).state
-		state = Model.select_project(state, "第%d年游戏" % (year + 1), "strategy", "modern", year + 1).state
-	check(Model.valid_state(state) and state.annual_projects.size() == 4, "当前未接入三年结束流程，日历继续时档案仍有效")
+		if year < Model.MAX_YEARS:
+			state = Model.select_project(state, "第%d年游戏" % (year + 1), "strategy", "modern", year + 1).state
+	check(Model.valid_state(state) and Model.is_finished(state) and state.annual_projects.size() == 3, "三年结束且只保留三款作品，不产生第四年")
 	var skill_state := state.duplicate(true)
 	skill_state.skill_runtime.temporary.append({"owner_id": Model.DEFINITIONS[0].id,
 		"skill_id": Model.DEFINITIONS[0].skills[0].skill_id, "name": "临时效果", "quip": "",
 		"target": "work", "apply_hook": "DUTY_BEFORE", "params": {"field": "g", "operation": "add", "amount": 1.0},
-		"year": 4, "month": 1, "duration": "year"})
+		"year": 3, "month": 12, "duration": "year"})
 	check(Model.valid_state(skill_state), "年度档案的存档校验允许当前年份的临时技能效果")
 	var skill_id: String = Model.DEFINITIONS[0].skills[0].skill_id
 	var skill_row := {"id": skill_id, "name": "年度作品识别", "description": "", "quip": "",
@@ -86,14 +87,15 @@ func _run() -> void:
 	var original_skill = SkillTable.skills[skill_id]
 	SkillTable.skills[skill_id] = SkillDefinition.from_row(skill_row)
 	var matching: Dictionary = Model.select_project(Roster.fresh(), "条件测试", "narrative", "sci_fi", 1).state
-	check(matching.inspiration == 5 and not matching.skill_log.is_empty(), "立项技能实际按类型题材 ID 触发")
+	check(matching.inspiration == 13 and not matching.skill_log.is_empty(), "立项技能实际按类型题材 ID 触发")
 	var not_matching: Dictionary = Model.select_project(Roster.fresh(), "条件测试", "narrative", "fantasy", 1).state
-	check(not_matching.inspiration == 2, "不匹配题材时不触发立项技能")
-	check(not Model.select_project(matching, "重复确认", "narrative", "sci_fi", 1).ok and matching.inspiration == 5, "重复确认不能重复发放立项技能收益")
+	check(not_matching.inspiration == 10, "不匹配题材时不触发立项技能")
+	check(not Model.select_project(matching, "重复确认", "narrative", "sci_fi", 1).ok and matching.inspiration == 13, "重复确认不能重复发放立项技能收益")
 	matching.month = 12
-	matching = Model.advance_work(matching, 1, 12).state
+	var annual_work := Model.advance_work(matching, 1, 12)
+	matching = annual_work.state
 	matching = Model.select_project(matching, "次年条件测试", "narrative", "sci_fi", 2).state
-	check(matching.inspiration == 9, "次年立项重新触发年度技能且共用全局灵感")
+	check(matching.inspiration == 16 + annual_work.report.inspiration_delta, "次年立项重新触发年度技能且共用全局灵感")
 	SkillTable.skills[skill_id] = original_skill
 	skill_row.triggers[0].conditions.genre_id = "unknown"
 	check(not SkillDefinition.validate(skill_row).is_empty(), "技能配置中的非法类型 ID 被拒绝")

@@ -180,7 +180,8 @@ func _show_values(fraction: float, id: int) -> void:
 		if KEYS[index] == "b" and float(contribution.b) <= 0.0:
 			continue
 		lines.append("%s  %s" % [CAPTIONS[index], NumberDisplay.text(float(contribution[KEYS[index]]) * fraction, true)])
-	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3, 5))
+	lines.append("灵感 %+d" % int(contribution.get("inspiration", 0)))
+	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3))
 
 ## 底部汇总只看本回合全员岗位产出的合计，不显示作品累计（累计值在主界面属性栏）。
 func _month_summary_text() -> String:

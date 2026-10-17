@@ -134,7 +134,7 @@ func _display(step: Dictionary) -> void:
 	step_title.add_theme_color_override("font_color", tone)
 	step_body.text = step.body
 	progress_label.text = "第 %d / %d 步" % [step_index + 1, steps.size()]
-	continue_button.text = "进入下一年" if step_index + 1 >= steps.size() else "继续"
+	continue_button.text = ("结算" if int(annual.get("year", 1)) >= Model.MAX_YEARS else "进入下一年") if step_index + 1 >= steps.size() else "继续"
 	scroll.scroll_vertical = 0
 	continue_button.grab_focus()
 	if reveal != null:

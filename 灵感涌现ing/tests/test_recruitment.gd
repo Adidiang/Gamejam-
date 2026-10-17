@@ -27,7 +27,7 @@ func year_end(state: Dictionary) -> Dictionary:
 		if not result.ok: return next
 		next = result.state
 		check(Model.valid_state(next), "Recruitment state remains valid after monthly settlement")
-		if int(next.month) == 1: return next
+		if int(next.month) == 1 or Model.is_finished(next): return next
 	return next
 
 func confirm_all(state: Dictionary) -> Dictionary:
@@ -61,7 +61,7 @@ func _run() -> void:
 	check(not Runner.active(unlocked, 0, Model.DEFINITIONS[0].skills[0]), "Even unlocked skills do not activate before recruitment")
 	var turn := Model.advance_work(state, 1, 1)
 	check(turn.state.work == {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0} and turn.report.skill_events.is_empty(), "Empty club produces no work or skill effects")
-	check(turn.state.inspiration == 3 and turn.state.month == 2, "Empty club still earns monthly inspiration and advances time")
+	check(turn.state.inspiration == 10 and turn.state.month == 2, "Empty club advances time without work inspiration")
 	var empty_view := WorkView.new()
 	root.add_child(empty_view)
 	empty_view.open(turn.report)
@@ -69,7 +69,7 @@ func _run() -> void:
 	empty_view.queue_free()
 	var pending := year_end(state)
 	check(Model.pending_recruits(pending) == ["a"] and Model.recruited_ids(pending).is_empty(), "Only sheep qualifies from the previous year's fantasy game and waits for confirmation")
-	check(pending.inspiration == 14 and pending.members[0].affinity == 0, "Entire first year has no staff or advance affinity")
+	check(pending.inspiration == 10 and pending.members[0].affinity == 0, "Entire first year has no staff or advance affinity")
 	check(not Model.select_project(pending, "提前立项", "act", "modern", 2).ok, "New project selection waits for recruitment events")
 	check(not Model.confirm_recruit(pending, "b").ok, "Wrong character cannot confirm an event")
 	check(Store.save_run(pending, "res://qa/recruitment_pending.json") == OK, "Pending recruitment can be saved")
@@ -129,8 +129,10 @@ func _run() -> void:
 	var many_joined := confirm_all(many)
 	var history := year_end(Model.select_project(many_joined, "只有现代", "act", "modern", 2).state)
 	check(Model.pending_recruits(history).is_empty(), "An older fantasy project cannot attract candidates after last year's modern project")
-	var again := year_end(Model.select_project(history, "再做奇幻", "rpg", "fantasy", 3).state)
-	check(Model.pending_recruits(again).size() == 2 and Model.pending_recruits(again).all(func(id: String): return id not in many.recruitment["2"].selected), "Already recruited characters never enter the lottery again")
+	var repeated := year_end(Model.select_project(many_joined, "再做奇幻", "rpg", "fantasy", 2).state)
+	check(Model.pending_recruits(repeated).size() == 2 and Model.pending_recruits(repeated).all(func(id: String): return id not in many.recruitment["2"].selected), "Already recruited characters never enter the lottery again")
+	var ending := year_end(Model.select_project(history, "最后的奇幻", "rpg", "fantasy", 3).state)
+	check(Model.is_finished(ending) and Model.pending_recruits(ending).is_empty() and not ending.recruitment.has("4"), "Final-year fantasy project cannot create fourth-year recruitment")
 	var damaged := many.duplicate(true)
 	damaged.recruitment["2"].selected[1] = damaged.recruitment["2"].selected[0]
 	check(not Model.valid_state(damaged), "Duplicate recruitment choices fail save validation")

@@ -68,7 +68,7 @@ func _run() -> void:
 	check(annual.bug_disaster and annual.trait == "BUG灾难" and near(annual.bug_probability, 0.8), "命中后作品获得特质 BUG灾难")
 	check(near(annual.score.total, 6000.0) and near(annual.score.pair, 5000.0) and near(annual.score.p, 1000.0), "灾难评分等于原分数与各项之和各 ×0.5")
 	check(award_ids(annual.awards) == ["best_game_nomination"] and annual.reward == 20, "灾难后只剩提名及其 20 灵感")
-	check(repeated.state.inspiration == disaster_state.inspiration + 1 + 20, "年末灵感 = 每月灵感 + 奖项奖励")
+	check(repeated.state.inspiration == disaster_state.inspiration + 20, "零脑洞成员的年末灵感仅来自奖项奖励")
 	check(near(annual.work.g, 6000.0) and near(annual.work.b, 100.0), "年度档案保留本年作品快照")
 	var healthy: Array = Model.annual_awards(Model.finalize_annual_score(Model.annual_score(annual.work), false))
 	check(award_ids(healthy) == ["best_game_nomination", "best_game"], "同一作品没有灾难时会拿到提名与最佳游戏")

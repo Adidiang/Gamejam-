@@ -3,9 +3,10 @@ extends RefCounted
 ## Deterministic rules. UI previews use a copied state and the same resolver as commit.
 
 const VERSION := 6
+const MAX_YEARS := 3
 ## 全局资源：归整个社团共有，可由回合、奖励和技能获得，供技能等系统消费。
-## 与作品属性、人物属性分开保存；继续沿用已有余额字段及数值。
-const INSPIRATION := {"name": "灵感", "initial": 2, "maximum": 10000, "monthly_gain": 1}
+## 与作品属性、人物属性分开保存；月末逐人按增幅后脑洞判定工作灵感。
+const INSPIRATION := {"name": "灵感", "initial": 10, "maximum": 10000}
 const CharacterTable = preload("res://scripts/character_table.gd")
 const GameCatalog = preload("res://scripts/game_catalog.gd")
 const SkillTable = preload("res://scripts/skills/skill_table.gd")
@@ -15,7 +16,7 @@ const AFFINITY_MAX := CharacterTable.AFFINITY_MAX
 const SKILL_SLOTS := CharacterTable.SKILL_SLOT_COUNT
 ## 每点好感带来的能力百分比增幅；好感上限 50 时最高 +50%。
 const ABILITY_PER_AFFINITY := 0.01
-## 数值转换单元：任何由属性算出的产出，都要在进入其他 buff 之前走一次这里。
+## 数值转换单元：由属性算出的作品产出，在进入其他 buff 之前走一次这里；工作灵感单独概率判定。
 ## 系数取 3 个 [0.5, 1.5] 均匀随机数的平均（Irwin–Hall 近似）；
 ## 种子由本局 ID、年月与产出对象决定，所以预览、重复结算和读档结果一致。
 ## 同一份产出只转换一次：转换之后叠加的 buff（例如梦想家翻倍）不再重复换算。
@@ -147,9 +148,29 @@ static func project_for_year(state: Dictionary, year: int = -1) -> Dictionary:
 	return state.get("annual_projects", {}).get(str(target_year), {}).duplicate(true)
 
 static func needs_project_selection(state: Dictionary) -> bool:
-	return state.has("annual_projects") and project_for_year(state).is_empty()
+	return not is_finished(state) and state.has("annual_projects") and project_for_year(state).is_empty()
+
+static func is_finished(state: Dictionary) -> bool:
+	return state.get("phase", "") == "finished"
+
+## 总结算独立于评奖：读取归档原始属性，不叠加评奖技能或 BUG灾难 系数。
+static func settlement_score(work: Dictionary) -> float:
+	return float(work.get("g", 0.0)) + float(work.get("i", 0.0)) + float(work.get("p", 0.0)) - 10.0 * float(work.get("b", 0.0))
+
+static func settlement_summary(state: Dictionary) -> Dictionary:
+	if not is_finished(state): return {}
+	var projects: Array = []
+	var total := 0.0
+	for year in range(1, MAX_YEARS + 1):
+		var annual := annual_result_for_year(state, year)
+		if annual.is_empty(): return {}
+		var score := settlement_score(annual.work)
+		projects.append({"year": year, "project": annual.project, "work": annual.work, "score": score})
+		total += score
+	return {"projects": projects, "total": total}
 
 static func select_project(state: Dictionary, title: String, genre_id: String, topic_id: String, expected_year: int) -> Dictionary:
+	if expected_year < 1 or expected_year > MAX_YEARS: return {"ok": false}
 	if not pending_recruits(state).is_empty() or not needs_project_selection(state) or int(state.year) != expected_year or int(state.month) != 1 or state.phase not in ["setup", "ready"]:
 		return {"ok": false}
 	var profile := {"id": "%s:project:%d" % [state.run_id, expected_year], "year": expected_year,
@@ -266,6 +287,7 @@ static func assign(state: Dictionary, id: int, role: int) -> Dictionary:
 
 ## 岗位结算入口：只有每月的全员工作会推进日历。
 static func advance_work(state: Dictionary, expected_year: int, expected_month: int) -> Dictionary:
+	if expected_year < 1 or expected_year > MAX_YEARS: return {"ok": false}
 	if needs_project_selection(state):
 		return {"ok": false}
 	if state.phase not in ["setup", "ready"] or int(state.year) != expected_year or int(state.month) != expected_month:
@@ -273,7 +295,6 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	var next := state.duplicate(true)
 	var old_inspiration := int(state.inspiration)
 	var duties := _resolve_duties(next, _metadata(next))
-	_change_inspiration(next, INSPIRATION.monthly_gain)
 	var records: Array = duties.records
 	var finished_work: Dictionary = next.work.duplicate(true)
 	var annual: Dictionary = {}
@@ -281,7 +302,8 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 		## 年末先判定 BUG灾难、再结算评奖与灵感，最后归档并让新作品从零开始。
 		annual = _resolve_annual_award(next, records)
 		finished_work = annual.work.duplicate(true)
-		next.work = {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}
+		if expected_year < MAX_YEARS:
+			next.work = {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}
 	var report := {"year": expected_year, "month": expected_month,
 		"inspiration_delta": int(next.inspiration) - old_inspiration, "inspiration": next.inspiration,
 		"contributions": duties.contributions,
@@ -291,11 +313,13 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	if expected_month == 12:
 		report.annual = annual
 	next.skill_log = records
-	next.month = 1 if expected_month == 12 else expected_month + 1
-	next.year = expected_year + 1 if expected_month == 12 else expected_year
+	var finished := expected_year == MAX_YEARS and expected_month == 12
+	next.month = 12 if finished else (1 if expected_month == 12 else expected_month + 1)
+	next.year = expected_year + 1 if expected_month == 12 and not finished else expected_year
+	if finished: next.phase = "finished"
 	SkillRunner.clear_expired_project_effect(next)
-	next.action_steps = 1
-	if expected_month == 12:
+	next.action_steps = 0 if finished else 1
+	if expected_month == 12 and not finished:
 		_prepare_recruitment(next)
 	return {"ok": true, "state": next, "report": report}
 
@@ -376,6 +400,16 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "skill_events": records,
 		"sleeping_member_ids": before.sleeping, "task_multiplier": before.task_multiplier}}
 
+## 工作灵感独立于作品数值转换：脑洞 40 对应 40%，每人每月最多 1 点。
+static func duty_inspiration(state: Dictionary, member_id: int) -> int:
+	if not is_recruited(state, member_id): return 0
+	var chance := clampf(float(ability(state, member_id)[1]) / 100.0, 0.0, 1.0)
+	if chance <= 0.0: return 0
+	if chance >= 1.0: return 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = ("%s:duty_inspiration:%d:%d:%s" % [state.run_id, int(state.year), int(state.month), DEFINITIONS[member_id].id]).hash()
+	return 1 if rng.randf() < chance else 0
+
 static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictionary:
 	var records: Array = []
 	var duty_plan := _plan(state)
@@ -402,6 +436,7 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 				raw.repair = 1.0 * stats[0]
 		## 计算规则 → 转换单元；转换之后才交给 DUTY_BEFORE 的其他 buff。
 		var contribution: Dictionary = transform_output(raw, duty_output_factor(state, member_id))
+		contribution.inspiration = duty_inspiration(state, member_id)
 		duty_plan.contributions[DEFINITIONS[member_id].id] = contribution
 	var stage := SkillRunner.run(state, DEFINITIONS, "DUTY_BEFORE", metadata, duty_plan)
 	var sleeping: Array = stage.sleeping
@@ -436,7 +471,9 @@ static func _metadata(state: Dictionary, actor: int = -1, action: int = -1) -> D
 
 static func _apply_plan(state: Dictionary, plan: Dictionary) -> void:
 	var delta: Dictionary = plan.work.duplicate(true)
+	var inspiration := float(plan.inspiration)
 	for contribution in plan.contributions.values():
+		inspiration += float(contribution.get("inspiration", 0.0))
 		for key in ["g", "i", "p", "b"]:
 			delta[key] = float(delta.get(key, 0.0)) + float(contribution[key])
 		delta.b -= float(contribution.repair)
@@ -444,7 +481,7 @@ static func _apply_plan(state: Dictionary, plan: Dictionary) -> void:
 	for member in state.members:
 		if not member.recruited: continue
 		member.affinity = clampi(int(member.affinity) + roundi(float(plan.affinity[member.id])), 0, AFFINITY_MAX)
-	_change_inspiration(state, roundi(float(plan.inspiration)))
+	_change_inspiration(state, roundi(inspiration))
 
 ## ---------------- 年度评奖 ----------------
 
@@ -542,15 +579,16 @@ static func valid_state(value: Variant) -> bool:
 	for key in fresh():
 		if not value.has(key):
 			return false
-	if value.version != VERSION or not value.phase in ["setup", "ready"]:
+	if value.version != VERSION or not value.phase in ["setup", "ready", "finished"]:
 		return false
 	if not _finite_range(value.action_steps, 0, 1) or float(value.action_steps) != int(value.action_steps): return false
 	if not value.run_id is String or value.run_id.is_empty(): return false
-	if not _finite_range(value.year, 1, 100000) or value.year != int(value.year): return false
+	if not _finite_range(value.year, 1, MAX_YEARS) or value.year != int(value.year): return false
 	if not value.month is float and not value.month is int:
 		return false
 	if float(value.month) != float(int(value.month)) or int(value.month) < 1 or int(value.month) > 12:
 		return false
+	if is_finished(value) and (int(value.year) != MAX_YEARS or int(value.month) != 12 or int(value.action_steps) != 0): return false
 	## 作品档案：每年一款；本年未确认只允许发生在一月。
 	if value.get("annual_project_schema", 0) != 1 or not value.annual_projects is Dictionary: return false
 	for year_key in value.annual_projects:
@@ -561,14 +599,16 @@ static func valid_state(value: Variant) -> bool:
 	var confirmed_years := int(value.year) - (1 if needs_project_selection(value) else 0)
 	if value.annual_projects.size() != confirmed_years: return false
 	if needs_project_selection(value) and int(value.month) != 1: return false
-	## 评奖档案：已结算的年份必须保留，本年不能提前出现。
+	## 评奖档案：终局包含第三年，其余状态的本年不能提前出现。
 	if not value.annual_results is Dictionary: return false
+	var finished_years := MAX_YEARS if is_finished(value) else int(value.year) - 1
 	for year_key in value.annual_results:
 		if not year_key is String or not year_key.is_valid_int() or str(int(year_key)) != year_key: return false
 		var result_year := int(year_key)
-		if result_year < 1 or result_year >= int(value.year): return false
+		if result_year < 1 or result_year > finished_years: return false
 		if not _valid_annual_result(value.annual_results[year_key], result_year, value.run_id): return false
-	for finished_year in range(1, int(value.year)):
+		if value.annual_results[year_key].project != value.annual_projects.get(year_key, {}): return false
+	for finished_year in range(1, finished_years + 1):
 		if not value.annual_results.has(str(finished_year)): return false
 	if not value.members is Array or value.members.size() != DEFINITIONS.size() or not value.work is Dictionary:
 		return false

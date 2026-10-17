@@ -76,7 +76,7 @@ func _run() -> void:
 	for id in 4:
 		scene.state.members[id].role = id
 	scene.show_main()
-	check(scene.inspiration_label.text == "灵感 2", "时间下方显示初始全局灵感")
+	check(scene.inspiration_label.text == "灵感 10", "时间下方显示初始全局灵感")
 	check(scene.inspiration_label.get_global_rect().position.y >= scene.time_label.get_global_rect().end.y, "灵感显示在时间下方")
 	scene.open_schedule()
 	await process_frame
@@ -86,8 +86,8 @@ func _run() -> void:
 	await process_frame
 	check(not scene.duty_panel.visible and panel.visible, "点击后排期关闭、工作界面打开")
 	check(scene.time_label.text == "第1年2月" and panel.title_label.text.contains("第1年1月"), "日历推进、工作报告标注刚结算月份")
-	check(scene.state.inspiration == 3 and scene.inspiration_label.text == "灵感 3", "每月获得灵感并刷新主界面余额")
-	check(panel.report.inspiration_delta == 1 and panel.report.inspiration == 3, "工作报告使用真实灵感余额及增量")
+	check(scene.state.inspiration == 10 + int(panel.report.inspiration_delta) and scene.inspiration_label.text == "灵感 %d" % int(scene.state.inspiration), "每月获得灵感并刷新主界面余额")
+	check(panel.report.inspiration == scene.state.inspiration and panel.report.inspiration_delta >= 0 and panel.report.inspiration_delta <= 4, "工作报告使用真实灵感余额及增量")
 	check(panel.playing and panel.finish_button.disabled, "播放时不能提前关闭")
 	var snapshot: Dictionary = scene.state.duplicate(true)
 	scene.duty_panel.next_turn_button.pressed.emit()
@@ -116,6 +116,12 @@ func _run() -> void:
 	check(not panel.playing and presented == range(Model.DEFINITIONS.size()), "全员按顺序自动播放完成")
 	check(panel.scroll.scroll_vertical > 0, "自动滚动到后续头像")
 	check(panel.value_labels[0].text.contains(member0_line), "展示数据来自真实贡献")
+	var inspiration_total := 0
+	for id in panel.report.contributions.size():
+		var earned := int(panel.report.contributions[id].get("inspiration", 0))
+		inspiration_total += earned
+		check(panel.value_labels[id].text.contains("灵感 %+d" % earned), "成员卡片显示各自灵感产出")
+	check(inspiration_total == panel.report.inspiration_delta, "工作灵感等于各成员判定结果之和")
 	check(not panel.finish_button.disabled, "全员完成后允许返回")
 	## 底部汇总只报本回合全员总计，不再报作品累计。
 	var totals := {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}
@@ -165,7 +171,7 @@ func _run() -> void:
 	scene.duty_panel.next_turn_button.pressed.emit()
 	await process_frame
 	check(scene.state.month == 3 and panel.current_member == 0, "下一月可再次结算，播放从第一人重置")
-	check(scene.inspiration_label.text == "灵感 4", "再次结算灵感继续累计")
+	check(scene.inspiration_label.text == "灵感 %d" % int(snapshot.inspiration + panel.report.inspiration_delta), "再次结算灵感继续累计")
 	scene.queue_free()
 	await process_frame
 	Model.DEFINITIONS = definitions

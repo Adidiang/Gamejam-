@@ -35,7 +35,7 @@ func _run() -> void:
 	check(initial.month == 1 and initial.action_steps == 1 and not initial.has("completed_tasks"), "执行不修改输入状态且初始一步")
 	check(is_equal_approx(result.report.task_delta.p, 50.0 * factor), "表现力等于脑洞加美术并经过转换单元")
 	check(is_equal_approx(result.report.task_delta.i, 50.0 * 20.0 / 30.0 * factor), "创新性使用脑洞美术比值")
-	check(result.state.year == 1 and result.state.month == 1 and result.state.action_steps == 0 and result.state.inspiration == 2, "任务只消费行动步数，不推进月份或获得月灵感")
+	check(result.state.year == 1 and result.state.month == 1 and result.state.action_steps == 0 and result.state.inspiration == 10, "任务只消费行动步数，不推进月份或获得月灵感")
 	check(result.report.delta.g == 0 and result.report.delta.b == 0 and float(result.report.delta.p) > 0, "任务只产出表现力与创新性，不结算职责")
 	check(result.report.inspiration_delta == 0 and not result.report.has("contributions"), "任务报告不包含月灵感或职责贡献")
 	check(Model.available_tasks(result.state).is_empty(), "全社团本年任务只执行一次")
@@ -45,7 +45,7 @@ func _run() -> void:
 	exhausted.action_steps = 0
 	check(not Model.execute_task(exhausted, 0, "art_concept", 1, 1).ok and exhausted.work.i == 0, "无步数时模型直接拒绝未做过的任务")
 	var advanced := Model.advance_work(result.state, 1, 1)
-	check(advanced.ok and advanced.state.month == 2 and advanced.state.action_steps == 1 and advanced.state.inspiration == 3, "排期推进月份、获得灵感并恢复步数")
+	check(advanced.ok and advanced.state.month == 2 and advanced.state.action_steps == 1 and advanced.state.inspiration == 10 + Model.duty_inspiration(result.state, 0), "排期推进月份、获得灵感并恢复步数")
 	check(advanced.report.contributions.size() == Model.DEFINITIONS.size() and is_equal_approx(advanced.report.work.g, 17.0 * Model.duty_output_factor(result.state, 0)), "职责仅在排期结算一次")
 	check(Model.available_tasks(advanced.state).is_empty(), "步数恢复不改变年度已完成任务记录")
 	var skipped := Model.advance_work(initial, 1, 1)
@@ -205,7 +205,7 @@ func _run() -> void:
 	scene.open_schedule()
 	await process_frame
 	await click(scene.duty_panel.next_turn_button.get_global_rect().get_center())
-	check(scene.state.month == 2 and scene.state.action_steps == 1 and scene.state.inspiration == 3, "通过排期正常进入下一回合并恢复步数")
+	check(scene.state.month == 2 and scene.state.action_steps == 1 and scene.state.inspiration == 10 + int(scene.work_panel.report.inspiration_delta), "通过排期正常进入下一回合并恢复步数")
 	while scene.work_panel.playing:
 		await process_frame
 	scene.work_panel.close()

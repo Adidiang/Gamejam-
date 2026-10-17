@@ -90,10 +90,41 @@ func _init() -> void:
 	check(JSON.stringify(blank) == snapshot, "结算不修改输入状态或嵌套数据")
 	check(settled.state.month == 2 and settled.state.year == 1 and settled.state.action_steps == 1, "结算推进一个月并恢复行动步数")
 	check(settled.state.work == {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}, "零属性不产出作品数值")
-	check(settled.state.inspiration == Model.INSPIRATION.initial + Model.INSPIRATION.monthly_gain, "每月获得一份灵感")
+	check(settled.state.inspiration == Model.INSPIRATION.initial, "零脑洞不产生工作灵感")
 	check(not Model.advance_work(settled.state, 1, 1).ok, "旧月份请求被拒绝")
 	check(settled.report.contributions.size() == Model.DEFINITIONS.size(), "报告保留全员贡献")
 	check(settled.report.project.title == "空属性", "报告带当年作品档案")
+	check(Model.fresh().inspiration == 10, "新游戏初始灵感为十点")
+	## 工作灵感：所有岗位独立判定，概率取增幅后脑洞，不走作品产出的转换系数。
+	var inspired := blank.duplicate(true)
+	for member in inspired.members: member.recruited = false
+	for id in 4:
+		inspired.members[id].recruited = true
+		inspired.members[id].role = id
+		Model.DEFINITIONS[id].stats = [0.0, 100.0, 0.0, 0.0]
+	Model.DEFINITIONS[3].stats[1] = 240.0
+	var four_workers := Model.advance_work(inspired, 1, 1)
+	check(four_workers.report.inspiration_delta == 4 and four_workers.state.inspiration == 14, "四种岗位各得一点，超过一百脑洞也只得一点")
+	check(four_workers.report.contributions.slice(0, 4).all(func(row: Dictionary): return row.inspiration == 1), "逐人报告记录工作灵感")
+	Model.DEFINITIONS[0].stats[1] = 80.0
+	inspired.members[0].affinity = 25
+	check(Model.duty_inspiration(inspired, 0) == 1, "好感增幅后的脑洞达到一百时必得")
+	inspired.members[0].affinity = 0
+	Model.DEFINITIONS[0].stats[1] = 40.0
+	var hits := 0
+	for index in 1000:
+		inspired.run_id = "inspiration-sample-%d" % index
+		hits += Model.duty_inspiration(inspired, 0)
+	check(hits > 330 and hits < 470, "四十脑洞的固定千次样本接近四成命中，兼有成功与失败")
+	var replay := Model.advance_work(inspired, 1, 1)
+	check(replay.report == Model.advance_work(inspired, 1, 1).report, "同一月份重复预览不重抽灵感")
+	var restored: Dictionary = JSON.parse_string(JSON.stringify(inspired))
+	check(Model.advance_work(restored, 1, 1).state.inspiration == replay.state.inspiration, "JSON 读档后灵感判定保持一致")
+	inspired.members[0].recruited = false
+	check(Model.duty_inspiration(inspired, 0) == 0, "未加入成员不产生灵感")
+	inspired.inspiration = 9999
+	check(Model.advance_work(inspired, 1, 1).state.inspiration == 10000, "多人工作收入遵守共享余额上限")
+	for definition in Model.DEFINITIONS: definition.stats = [0.0, 0.0, 0.0, 0.0]
 
 	## 5. 任务与邀约共用行动步数，都不推进月份
 	var task := Model.execute_task(blank, 0, "art_concept", 1, 1)
@@ -123,10 +154,10 @@ func _init() -> void:
 	## 7. 灵感是全局资源
 	var resource_state := Roster.fresh()
 	var earned := Model.gain_inspiration(resource_state, 7)
-	check(earned.inspiration == 9 and resource_state.inspiration == Model.INSPIRATION.initial, "灵感获得不修改输入状态")
+	check(earned.inspiration == 17 and resource_state.inspiration == Model.INSPIRATION.initial, "灵感获得不修改输入状态")
 	var spent := Model.spend_inspiration(earned, 4)
-	check(spent.inspiration == 5 and earned.inspiration == 9, "灵感消费不修改输入状态")
-	check(Model.spend_inspiration(spent, 6) == spent and Model.spend_inspiration(spent, -1) == spent, "超额与负数消费被拒绝")
+	check(spent.inspiration == 13 and earned.inspiration == 17, "灵感消费不修改输入状态")
+	check(Model.spend_inspiration(spent, 14) == spent and Model.spend_inspiration(spent, -1) == spent, "超额与负数消费被拒绝")
 	check(Model.gain_inspiration(spent, -1) == spent, "负数获得被拒绝")
 	check(Model.gain_inspiration(earned, 10000).inspiration == Model.INSPIRATION.maximum, "灵感有上限")
 
@@ -135,6 +166,7 @@ func _init() -> void:
 	SkillTable.skills[slot_id] = SkillDefinition.from_row({"id": slot_id, "name": "付费测试", "description": "测试技能", "quip": "",
 		"acquisition": "inspiration", "inspiration_cost": 3, "triggers": []})
 	var poor := Roster.fresh()
+	poor.inspiration = 2
 	check(Model.learn(poor, 0, 0) == poor, "灵感不足时不能习得")
 	poor.inspiration = 5
 	var learned := Model.learn(poor, 0, 0)

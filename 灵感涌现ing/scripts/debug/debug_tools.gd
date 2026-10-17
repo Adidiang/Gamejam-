@@ -38,6 +38,7 @@ static func work_values(state: Dictionary) -> Dictionary:
 static func change_work(state: Dictionary, key: String, mode: String, amount: float) -> Dictionary:
 	if not enabled():
 		return _reject(DISABLED_MESSAGE)
+	if Model.is_finished(state): return _reject("三年已结束。")
 	if key not in WORK_KEYS:
 		return _reject("未知的作品属性。")
 	if mode not in MODES:
@@ -61,6 +62,7 @@ static func change_work(state: Dictionary, key: String, mode: String, amount: fl
 static func jump_month(state: Dictionary, target_month: int) -> Dictionary:
 	if not enabled():
 		return _reject(DISABLED_MESSAGE)
+	if Model.is_finished(state): return _reject("三年已结束。")
 	if Model.needs_project_selection(state):
 		return _reject("本年还没有立项，无法跳转月份。")
 	if target_month < 1 or target_month > MONTHS_IN_YEAR:
@@ -78,6 +80,8 @@ static func jump_month(state: Dictionary, target_month: int) -> Dictionary:
 ## 好感上限与技能解锁门槛都由现有规则决定，这里不改习得费用、也不免费习得技能。
 ## backup 由调用方保存（通常是主界面），重复开启与没有记录时关闭都会被拒绝。
 static func set_full_affinity(state: Dictionary, on: bool, backup: Array) -> Dictionary:
+	if Model.is_finished(state):
+		return {"ok": false, "state": state, "backup": backup, "message": "三年已结束。"}
 	if not enabled():
 		return {"ok": false, "state": state, "backup": backup, "message": DISABLED_MESSAGE}
 	if on and not backup.is_empty():
