@@ -202,7 +202,7 @@ func _run() -> void:
 	check(not Model.valid_state(damaged), "Unknown outcome cannot enter a valid save")
 	var legacy := ready(false)
 	for member in legacy.members: member.erase("ability_growth")
-	check(Model.valid_state(legacy) and near(Model.base_ability(0, legacy)[1], 100), "Existing saves without growth fields retain zero-growth defaults")
+	check(not Model.valid_state(legacy) and near(Model.base_ability(0, legacy)[1], 100), "Current save schema rejects missing growth fields; read-only ability preview retains its fallback")
 
 	# 用户能看见三技能的真实结果，而非只有后台数值变化。
 	var sheet := Sheet.new()
