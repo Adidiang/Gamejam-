@@ -63,6 +63,7 @@ var member_sheet: PanelContainer
 var duty_panel: Control
 var work_panel: Control
 var task_panel: Control
+var trait_labels: Dictionary = {}
 var task_execution: Control
 var invite_pending := false
 var game_selection: Control
@@ -142,7 +143,9 @@ func _ready() -> void:
 	close_button.pressed.connect(close_character)
 	for index in character_buttons.size():
 		var button := character_buttons[index]
-		button.text = CHARACTER_IDS[index]
+		button.text = Model.DEFINITIONS[index].name
+		button.tooltip_text = Model.DEFINITIONS[index].name
+		button.add_theme_font_size_override("font_size", 18)
 		if _attach_portrait(button, index):
 			_style_portrait_button(button)
 		else:
@@ -285,10 +288,10 @@ func open_schedule() -> void:
 func open_tasks() -> void:
 	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
 		return
-	if Model.action_steps(state) <= 0:
+	if Model.action_steps(state) <= 0 and not Model.Characters.free_task(state, Model.DEFINITIONS, CHARACTER_IDS.find(selected_character)):
 		member_sheet.show_action_notice()
 		return
-	task_panel.open(state)
+	task_panel.open(state, CHARACTER_IDS.find(selected_character))
 
 func open_invite() -> void:
 	if not character_screen.visible or task_execution.visible or task_panel.visible or award_screen.visible or recruitment_panel.visible or invite_pending or _debug_open():
@@ -302,7 +305,7 @@ func open_invite() -> void:
 	var year := int(state.year)
 	var month := int(state.month)
 	invite_pending = true
-	var confirmed: bool = await get_node("/root/TextConfirm").ask("邀约 %s？\n消耗 1 行动步数，好感度 +10（上限 50）。" % selected_character)
+	var confirmed: bool = await get_node("/root/TextConfirm").ask("邀约 %s？\n消耗 1 行动步数，好感度 +%d（上限 50）。" % [Model.DEFINITIONS[member_id].name, Model.invite_gain(state, member_id)])
 	invite_pending = false
 	if not confirmed or not character_screen.visible or CHARACTER_IDS.find(selected_character) != member_id:
 		return
@@ -318,7 +321,11 @@ func _confirm_task(task_id: String) -> void:
 	var member_id := CHARACTER_IDS.find(selected_character)
 	var year := int(state.year)
 	var month := int(state.month)
-	var confirmed: bool = await get_node("/root/TextConfirm").ask("让 %s 执行美术概念设计？\n消耗 1 行动步数。\n每款游戏（每年）全社团只能执行一次。" % selected_character)
+	var task_name := task_id
+	for task in Model.available_tasks(state, member_id):
+		if task.id == task_id: task_name = task.name
+	var cost := 0 if Model.Characters.free_task(state, Model.DEFINITIONS, member_id) else 1
+	var confirmed: bool = await get_node("/root/TextConfirm").ask("让 %s 执行%s？\n消耗 %d 行动步数。\n此任务每款游戏（每年）全社团只能执行一次。" % [Model.DEFINITIONS[member_id].name, task_name, cost])
 	task_panel.pending = false
 	if not confirmed:
 		return
@@ -326,7 +333,7 @@ func _confirm_task(task_id: String) -> void:
 		return
 	var result := Model.execute_task(state, member_id, task_id, year, month)
 	if not result.ok:
-		task_panel.open(state)
+		task_panel.open(state, CHARACTER_IDS.find(selected_character))
 		return
 	state = result.state
 	task_panel.hide()
@@ -367,6 +374,8 @@ func refresh_status() -> void:
 	innovation_label.text = "创新性 " + NumberDisplay.text(float(work.get("i", 0.0)))
 	presentation_label.text = "表现力 " + NumberDisplay.text(_presentation(work))
 	bug_label.text = "Bug " + NumberDisplay.text(float(work.get("b", 0.0)))
+	for key in trait_labels:
+		trait_labels[key].text = str(int(state.get("project_traits", {}).get(key, 0)))
 
 func _project_line() -> String:
 	## 作品名字与类型题材都来自当年的作品档案。
@@ -500,6 +509,36 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _style_hud_panels() -> void:
+	var header := HBoxContainer.new()
+	var status_column := $MainScreen/StatusPanel/StatusColumn
+	status_column.add_child(header)
+	status_column.move_child(header, 0)
+	project_label.reparent(header)
+	project_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var traits_row := HBoxContainer.new()
+	traits_row.add_theme_constant_override("separation", 8)
+	header.add_child(traits_row)
+	for key in ["manuscripts", "creatures"]:
+		var badge := HBoxContainer.new()
+		badge.tooltip_text = "手稿：每份使全队表现力产出+1%" if key == "manuscripts" else "小生物：供相关角色技能与任务使用"
+		traits_row.add_child(badge)
+		var icon := TextureRect.new()
+		icon.texture = load("res://assets/manuscript.svg" if key == "manuscripts" else "res://assets/creature.svg")
+		icon.custom_minimum_size = Vector2(22, 22)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		badge.add_child(icon)
+		var caption := Label.new()
+		caption.text = "手稿" if key == "manuscripts" else "小生物"
+		caption.add_theme_color_override("font_color", INK)
+		caption.add_theme_font_size_override("font_size", 14)
+		badge.add_child(caption)
+		var count := Label.new()
+		count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		count.add_theme_color_override("font_color", TEAL)
+		count.add_theme_font_size_override("font_size", 18)
+		badge.add_child(count)
+		trait_labels[key] = count
 	var box := _box(PAPER, INK, 2)
 	box.set_corner_radius_all(6)
 	box.content_margin_left = 20.0
@@ -567,7 +606,7 @@ func _create_background(screen: Control) -> TextureRect:
 
 func _attach_portrait(button: Button, member_id: int) -> bool:
 	## 人物表里的立绘写进场景里的 Portrait 子节点，并返回该入口是否配了立绘；
-	## 没有立绘时保留矩形与编号文字。
+	## 没有立绘时保留矩形与角色名字。
 	var portrait := button.get_node_or_null(PORTRAIT_NODE) as TextureRect
 	if portrait == null:
 		return false

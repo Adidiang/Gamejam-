@@ -57,10 +57,14 @@ func _ready() -> void:
 	side_column.add_child(slogan)
 	var note := _label("和社团一起，\n把今年的灵感做成游戏。", 20, Color("c1d0c5"))
 	side_column.add_child(note)
+	var form := VBoxContainer.new()
+	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(form)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(scroll)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	form.add_child(scroll)
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 14)
@@ -99,7 +103,7 @@ func _ready() -> void:
 	affinity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_column.add_child(affinity_label)
 	hint_label = _label("", 18, MUTED)
-	column.add_child(hint_label)
+	form.add_child(hint_label)
 	confirm_button = Button.new()
 	confirm_button.text = "确认，开始今年的开发"
 	confirm_button.custom_minimum_size.y = 62
@@ -107,7 +111,7 @@ func _ready() -> void:
 	confirm_button.add_theme_stylebox_override("normal", _box(TEAL, TEAL, 14))
 	confirm_button.add_theme_color_override("font_color", PAPER)
 	confirm_button.pressed.connect(_submit)
-	column.add_child(confirm_button)
+	form.add_child(confirm_button)
 	resized.connect(_layout)
 	_layout()
 	hide()

@@ -9,10 +9,13 @@ const GameCatalog = preload("res://scripts/game_catalog.gd")
 @export var acquisition: String
 @export var inspiration_cost: int
 @export var triggers: Array
+@export var implementation: String = "triggers"
 
 static func validate(row: Variant) -> String:
 	if not row is Dictionary or not row.has_all(["id", "name", "description", "quip", "acquisition", "inspiration_cost", "triggers"]):
 		return "技能定义缺少必填字段。"
+	if row.get("implementation", "triggers") not in ["triggers", "character_rules"]:
+		return "未知的技能实现方式。"
 	for key in ["id", "name", "description", "quip", "acquisition"]:
 		if not row[key] is String:
 			return "技能 %s 必须为文本。" % key
@@ -20,7 +23,7 @@ static func validate(row: Variant) -> String:
 		return "技能需要唯一 ID，acquisition 必须是 auto 或 inspiration。"
 	if not (row.inspiration_cost is int or row.inspiration_cost is float) or not is_finite(float(row.inspiration_cost)) or row.inspiration_cost != int(row.inspiration_cost):
 		return "灵感费用必须为整数。"
-	if (row.acquisition == "auto" and row.inspiration_cost != 0) or (row.acquisition == "inspiration" and row.inspiration_cost <= 0):
+	if (row.acquisition == "auto" and row.inspiration_cost != 0) or (row.acquisition == "inspiration" and row.inspiration_cost <= 0 and not (row.id == "j_skill_3" and row.inspiration_cost == -50)):
 		return "自动技能费用为 0，付费技能费用必须大于 0。"
 	if not row.triggers is Array:
 		return "triggers 必须为数组。"
@@ -67,4 +70,5 @@ static func from_row(row: Dictionary):
 	definition.acquisition = row.acquisition
 	definition.inspiration_cost = int(row.inspiration_cost)
 	definition.triggers = row.triggers.duplicate(true)
+	definition.implementation = row.get("implementation", "triggers")
 	return definition

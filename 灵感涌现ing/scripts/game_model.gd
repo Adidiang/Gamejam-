@@ -2,7 +2,8 @@ class_name ClubGame
 extends RefCounted
 ## Deterministic rules. UI previews use a copied state and the same resolver as commit.
 
-const VERSION := 6
+const VERSION := 7
+const Characters = preload("res://scripts/skills/character_rules.gd")
 ## 全局资源：归整个社团共有，可由回合、奖励和技能获得，供技能等系统消费。
 ## 与作品属性、人物属性分开保存；继续沿用已有余额字段及数值。
 const INSPIRATION := {"name": "灵感", "initial": 2, "maximum": 10000, "monthly_gain": 1}
@@ -52,7 +53,8 @@ static func fresh() -> Dictionary:
 	return {"version": VERSION, "phase": "setup", "year": 1, "month": 1, "inspiration": INSPIRATION.initial, "action_steps": 1,
 		"run_id": "%.6f:%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()],
 		"skill_runtime": {"events": {}, "counts": {}, "temporary": []}, "skill_log": [],
-		"members": members, "recruitment": {},
+		"members": members, "recruitment": {}, "project_traits": {"manuscripts": 0, "creatures": 0},
+		"action_serial": 0, "extra_recruitment": false, "character_month": "",
 		"work": {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0},
 		"annual_project_schema": 1, "annual_projects": {}, "annual_results": {}}
 
@@ -89,11 +91,12 @@ static func _prepare_recruitment(state: Dictionary) -> void:
 	var selected: Array = []
 	var rng := RandomNumberGenerator.new()
 	rng.seed = ("%s:recruitment:%d" % [state.run_id, int(state.year)]).hash()
-	while not candidates.is_empty() and selected.size() < 2:
+	while not candidates.is_empty() and selected.size() < (3 if state.get("extra_recruitment", false) else 2):
 		var index := rng.randi_range(0, candidates.size() - 1)
 		selected.append(candidates[index])
 		candidates.remove_at(index)
 	state.recruitment[key] = {"selected": selected, "confirmed": 0}
+	state.extra_recruitment = false
 
 static func pending_recruits(state: Dictionary) -> Array:
 	var record: Dictionary = state.get("recruitment", {}).get(str(int(state.year)), {})
@@ -108,6 +111,7 @@ static func confirm_recruit(state: Dictionary, character_id: String) -> Dictiona
 	var next := state.duplicate(true)
 	next.members[member_id].recruited = true
 	next.recruitment[str(int(next.year))].confirmed += 1
+	Characters.sync(next, DEFINITIONS)
 	return {"ok": true, "state": next}
 
 static func _valid_recruitment(state: Dictionary) -> bool:
@@ -120,7 +124,7 @@ static func _valid_recruitment(state: Dictionary) -> bool:
 		if year < 2 or year > int(state.year): return false
 		var record: Variant = state.recruitment[year_key]
 		if not record is Dictionary or not record.has_all(["selected", "confirmed"]): return false
-		if not record.selected is Array or record.selected.size() > 2 or not _finite_range(record.confirmed, 0, record.selected.size()) or float(record.confirmed) != int(record.confirmed): return false
+		if not record.selected is Array or record.selected.size() > 3 or not _finite_range(record.confirmed, 0, record.selected.size()) or float(record.confirmed) != int(record.confirmed): return false
 		if int(record.confirmed) < record.selected.size() and (year != int(state.year) or int(state.month) != 1 or not needs_project_selection(state)): return false
 		for index in record.selected.size():
 			var id: Variant = record.selected[index]
@@ -168,6 +172,7 @@ static func select_project(state: Dictionary, title: String, genre_id: String, t
 	_apply_plan(next, after.plan)
 	next.skill_log = before.records + after.records
 	next.phase = "ready"
+	Characters.sync(next, DEFINITIONS, true)
 	return {"ok": true, "state": next, "project": profile.duplicate(true)}
 
 ## 白值：人物表基础属性，加上直接增加的数值。
@@ -176,20 +181,32 @@ static func base_ability(id: int, state: Dictionary = {}) -> Array:
 	var result: Array = []
 	var growth: Array = state.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0]) if state.has("members") else [0.0, 0.0, 0.0, 0.0]
 	for index in DEFINITIONS[id].stats.size():
-		result.append(float(DEFINITIONS[id].stats[index]) + float(growth[index]))
+		var extra := 0.0
+		if state.has("members") and DEFINITIONS[id].id == "h" and index in [0, 3]:
+			extra = float(state.members[id].get("character_runtime", {}).get("creature_stats", 0))
+		result.append(maxf(0.0, float(DEFINITIONS[id].stats[index]) + float(growth[index])) + extra)
 	return result
 
-## 百分比增幅合计：目前只有好感增幅。
-## 后续技能的百分比增幅在这里相加，最终只对白值乘一次。
+## 四项共用的百分比增幅：好感与白鼠月初BUG加成相加。
+## 蜻蜓的美术专属增幅由 ability() 在同一乘区加入。
 static func ability_bonus(state: Dictionary, id: int) -> float:
-	return ABILITY_PER_AFFINITY * float(state.members[id].affinity)
+	var bonus := ABILITY_PER_AFFINITY * float(state.members[id].affinity)
+	if DEFINITIONS[id].id == "d" and Characters.has_skill(state, DEFINITIONS, id, 0):
+		bonus += float(state.members[id].get("character_runtime", {}).get("bug_bonus", 0.0))
+	return bonus
 
 ## 最终能力 = 白值 × (1 + 百分比增幅合计)。
 static func ability(state: Dictionary, id: int) -> Array:
 	var factor: float = 1.0 + ability_bonus(state, id)
 	var result: Array = []
-	for value in base_ability(id, state):
-		result.append(value * factor)
+	var base := base_ability(id, state)
+	for index in base.size():
+		var extra := float(state.members[id].get("character_runtime", {}).get("art_bonus", 0.0)) if DEFINITIONS[id].id == "f" and index == 2 else 0.0
+		result.append(float(base[index]) * (factor + extra))
+	if DEFINITIONS[id].id == "e" and Characters.has_skill(state, DEFINITIONS, id, 0):
+		var programming: float = result[0]
+		result[0] = result[1]
+		result[1] = programming
 	return result
 
 ## 表现力是作品属性本身（美术与音乐岗位、美术概念设计都直接产出它）。
@@ -241,7 +258,7 @@ static func _change_inspiration(state: Dictionary, delta: int) -> void:
 	state.inspiration = clampi(int(state.inspiration) + delta, 0, INSPIRATION.maximum)
 
 static func invite_gain(state: Dictionary, id: int) -> int:
-	return mini(AFFINITY_MAX - int(state.members[id].affinity), 10)
+	return mini(AFFINITY_MAX - int(state.members[id].affinity), 15 if DEFINITIONS[id].id == "b" and Characters.has_skill(state, DEFINITIONS, id, 0) else 10)
 
 static func learn(state: Dictionary, id: int, slot_index: int = 0) -> Dictionary:
 	if state.phase not in ["setup", "ready"] or id < 0 or id >= DEFINITIONS.size() or not is_recruited(state, id) or slot_index < 0 or slot_index >= SKILL_SLOTS:
@@ -252,8 +269,10 @@ static func learn(state: Dictionary, id: int, slot_index: int = 0) -> Dictionary
 		return state
 	if slot.skill_id in state.members[id].learned_skills or int(state.members[id].affinity) < int(slot.unlock_affinity) or int(state.inspiration) < skill.inspiration_cost:
 		return state
-	var next := spend_inspiration(state, skill.inspiration_cost)
+	var next := state.duplicate(true)
+	_change_inspiration(next, -skill.inspiration_cost)
 	next.members[id].learned_skills.append(skill.id)
+	Characters.sync(next, DEFINITIONS)
 	return next
 
 static func assign(state: Dictionary, id: int, role: int) -> Dictionary:
@@ -271,6 +290,7 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	if state.phase not in ["setup", "ready"] or int(state.year) != expected_year or int(state.month) != expected_month:
 		return {"ok": false}
 	var next := state.duplicate(true)
+	Characters.sync(next, DEFINITIONS)
 	var old_inspiration := int(state.inspiration)
 	var duties := _resolve_duties(next, _metadata(next))
 	_change_inspiration(next, INSPIRATION.monthly_gain)
@@ -282,9 +302,10 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 		annual = _resolve_annual_award(next, records)
 		finished_work = annual.work.duplicate(true)
 		next.work = {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}
+		next.project_traits = {"manuscripts": 0, "creatures": 0}
 	var report := {"year": expected_year, "month": expected_month,
 		"inspiration_delta": int(next.inspiration) - old_inspiration, "inspiration": next.inspiration,
-		"contributions": duties.contributions,
+		"contributions": duties.contributions, "character_messages": duties.messages,
 		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "work": finished_work,
 		"sleeping_member_ids": duties.sleeping, "skill_events": records,
 		"project": project_for_year(state)}
@@ -297,6 +318,8 @@ static func advance_work(state: Dictionary, expected_year: int, expected_month: 
 	next.action_steps = 1
 	if expected_month == 12:
 		_prepare_recruitment(next)
+	else:
+		Characters.sync(next, DEFINITIONS, true)
 	return {"ok": true, "state": next, "report": report}
 
 ## 任务次数归当前作品（年份）共有，不因更换执行成员而重置。
@@ -306,32 +329,53 @@ const TASKS := [{"id": "art_concept", "name": "美术概念设计", "cost": 1}]
 static func action_steps(state: Dictionary) -> int:
 	return int(state.get("action_steps", 1))
 
-static func available_tasks(state: Dictionary) -> Array:
-	if needs_project_selection(state):
-		return []
-	if state.phase not in ["setup", "ready"] or action_steps(state) < 1 or recruited_ids(state).is_empty():
-		return []
+static func available_tasks(state: Dictionary, member_id: int = -1) -> Array:
+	if needs_project_selection(state) or state.phase not in ["setup", "ready"] or recruited_ids(state).is_empty(): return []
+	if member_id >= 0 and not is_recruited(state, member_id): return []
+	if action_steps(state) < 1 and not Characters.free_task(state, DEFINITIONS, member_id): return []
 	var completed: Array = state.get("completed_tasks", {}).get(str(int(state.year)), [])
-	return TASKS.filter(func(task: Dictionary): return task.id not in completed)
+	var result: Array = TASKS.filter(func(task: Dictionary): return task.id not in completed)
+	if member_id >= 0:
+		for task in Characters.TASKS:
+			if task.owner == DEFINITIONS[member_id].id and task.id not in completed and Characters.has_skill(state, DEFINITIONS, member_id, int(task.slot)):
+				result.append(task)
+	return result
 
 static func execute_task(state: Dictionary, member_id: int, task_id: String, expected_year: int, expected_month: int) -> Dictionary:
-	if not is_recruited(state, member_id) or int(state.year) != expected_year or int(state.month) != expected_month:
-		return {"ok": false}
-	var available := available_tasks(state)
-	if not available.any(func(task: Dictionary): return task.id == task_id):
-		return {"ok": false}
+	if not is_recruited(state, member_id) or int(state.year) != expected_year or int(state.month) != expected_month: return {"ok": false}
+	var available := available_tasks(state, member_id)
+	var selected: Dictionary = {}
+	for task in available:
+		if task.id == task_id: selected = task
+	if selected.is_empty(): return {"ok": false}
 	var stats := ability(state, member_id)
 	var plan := _plan(state)
-	## 计算规则 → 转换单元：产出先算出来并只转换一次，再交给 ACTION_BEFORE 的 buff（如梦想家翻倍）。
-	var raw := {"p": float(stats[1]) + float(stats[2]), "i": 0.0}
-	# 仅美术概念设计：分母最低取 1，比值限制为 0.1～2，不改变人物属性。
-	raw.i = raw.p * clampf(float(stats[1]) / maxf(1.0, float(stats[2])), 0.1, 2.0)
-	var output: Dictionary = transform_output(raw, task_output_factor(state, member_id, task_id))
-	plan.work.p = float(output.p)
-	plan.work.i = float(output.i)
+	var raw := {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0}
+	var attribute_output := false
+	match task_id:
+		"art_concept":
+			raw.p = float(stats[1]) + float(stats[2])
+			raw.i = raw.p * clampf(float(stats[1]) / maxf(1.0, float(stats[2])), 0.1, 2.0)
+			attribute_output = true
+		"restructure":
+			raw.b = -4.0 * float(stats[0])
+			attribute_output = true
+		"stylize": raw.i = float(state.work.p)
+		"sound_conduction":
+			raw.g = float(state.get("project_traits", {}).get("creatures", 0)) * (float(stats[0]) + float(stats[3])) * 0.5
+			raw.p = raw.g
+			attribute_output = true
+		"shared_world":
+			var previous: Dictionary = state.annual_results.get(str(int(state.year) - 1), {}).get("work", {})
+			raw.i = float(previous.get("i", 0.0))
+			raw.p = float(previous.get("p", 0.0))
+	var output: Dictionary = transform_output(raw, task_output_factor(state, member_id, task_id)) if attribute_output else raw
+	Characters.modify_output(state, DEFINITIONS, member_id, output, false)
+	plan.work = output
+	if DEFINITIONS[member_id].id == "g" and Characters.has_skill(state, DEFINITIONS, member_id, 1): plan.inspiration = 1.0
 	var metadata := _metadata(state, member_id, 3)
 	metadata.task_id = task_id
-	return _execute_member_action(state, member_id, metadata, plan, TASKS[0].name)
+	return _execute_member_action(state, member_id, metadata, plan, selected.name)
 
 ## 邀约与任务共用行动余额，只执行行动技能，不推进月份或结算职责。
 static func execute_invite(state: Dictionary, member_id: int, expected_year: int, expected_month: int) -> Dictionary:
@@ -347,10 +391,20 @@ static func execute_invite(state: Dictionary, member_id: int, expected_year: int
 
 static func _execute_member_action(state: Dictionary, member_id: int, metadata: Dictionary, plan: Dictionary, action_name: String) -> Dictionary:
 	var next := state.duplicate(true)
-	next.action_steps = action_steps(state) - 1
+	Characters.sync(next, DEFINITIONS)
+	var free: bool = metadata.action_kind == "task" and Characters.free_task(next, DEFINITIONS, member_id)
+	next.action_steps = action_steps(state) - (0 if free else 1)
+	if free: next.members[member_id].character_runtime.free_task = 0
 	var old_work: Dictionary = next.work.duplicate(true)
+	var old_traits: Dictionary = Characters.traits(next).duplicate(true)
+	var character_messages: Array = []
 	var old_inspiration := int(next.inspiration)
 	var before := SkillRunner.run(next, DEFINITIONS, "ACTION_BEFORE", metadata, plan)
+	if metadata.action_kind == "task" and DEFINITIONS[member_id].id not in before.sleeping:
+		var repaired := minf(float(next.work.b), maxf(0.0, -float(before.plan.work.b)))
+		if DEFINITIONS[member_id].id == "d" and Characters.has_skill(next, DEFINITIONS, member_id, 1): before.plan.work.g += repaired
+		Characters.task_effect(next, DEFINITIONS, member_id, metadata.task_id)
+		Characters.after_output(next, DEFINITIONS, member_id, before.plan.work, false, repaired, character_messages)
 	_apply_plan(next, before.plan)
 	metadata.action_result = before.plan.duplicate(true)
 	metadata.sleeping_member_ids = before.sleeping
@@ -364,6 +418,8 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 		if not next.completed_tasks.has(year_key):
 			next.completed_tasks[year_key] = []
 		next.completed_tasks[year_key].append(metadata.task_id)
+	Characters.sync(next, DEFINITIONS)
+	next.action_serial = int(next.get("action_serial", 0)) + 1
 	var records: Array = before.records + after.records
 	next.skill_log = records
 	var delta := {"p": performance(next.work) - performance(old_work)}
@@ -374,14 +430,17 @@ static func _execute_member_action(state: Dictionary, member_id: int, metadata: 
 		"task_delta": delta, "delta": delta,
 		"inspiration_delta": int(next.inspiration) - old_inspiration, "inspiration": next.inspiration,
 		"members_before": state.members.duplicate(true), "members": next.members.duplicate(true), "skill_events": records,
-		"sleeping_member_ids": before.sleeping, "task_multiplier": before.task_multiplier}}
+		"sleeping_member_ids": before.sleeping, "task_multiplier": before.task_multiplier,
+		"free_task": free, "character_messages": character_messages, "traits_before": old_traits, "project_traits": Characters.traits(next).duplicate(true)}}
 
 static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictionary:
 	var records: Array = []
 	var duty_plan := _plan(state)
+	var messages: Dictionary = {}
 	for member_id in recruited_ids(state):
 		var stats := ability(state, member_id)
 		var member: Dictionary = state.members[member_id]
+		if member.id == "j" and Characters.has_skill(state, DEFINITIONS, member_id, 0) and Characters.drunk(state, member_id): stats[1] *= 1.5
 		var raw := {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}
 		match int(member.role):
 			0:
@@ -402,9 +461,25 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 				raw.repair = 1.0 * stats[0]
 		## 计算规则 → 转换单元；转换之后才交给 DUTY_BEFORE 的其他 buff。
 		var contribution: Dictionary = transform_output(raw, duty_output_factor(state, member_id))
+		Characters.modify_output(state, DEFINITIONS, member_id, contribution, true)
 		duty_plan.contributions[DEFINITIONS[member_id].id] = contribution
 	var stage := SkillRunner.run(state, DEFINITIONS, "DUTY_BEFORE", metadata, duty_plan)
 	var sleeping: Array = stage.sleeping
+	# 同月先汇总BUG生成，再按稳定成员顺序分配实际修复量，避免超修复重复计收益。
+	var remaining_bugs := float(state.work.b)
+	for contribution in stage.plan.contributions.values(): remaining_bugs += float(contribution.b)
+	for id in recruited_ids(state):
+		var key: String = DEFINITIONS[id].id
+		var contribution: Dictionary = stage.plan.contributions[key]
+		var repaired := minf(remaining_bugs, maxf(0.0, float(contribution.repair)))
+		remaining_bugs -= repaired
+		messages[key] = []
+		if key in sleeping: continue
+		if key == "d" and Characters.has_skill(state, DEFINITIONS, id, 1): contribution.g += repaired
+		if key == "g" and Characters.has_skill(state, DEFINITIONS, id, 1):
+			stage.plan.inspiration += 1.0
+			messages[key].append("灵感 +1")
+		Characters.after_output(state, DEFINITIONS, id, contribution, true, repaired, messages[key])
 	var contributions: Array = []
 	for member in state.members:
 		contributions.append(stage.plan.contributions.get(member.id, {"g": 0.0, "i": 0.0, "p": 0.0, "b": 0.0, "repair": 0.0}).duplicate(true))
@@ -415,7 +490,8 @@ static func _resolve_duties(state: Dictionary, metadata: Dictionary) -> Dictiona
 	stage = SkillRunner.run(state, DEFINITIONS, "DUTY_AFTER", metadata, _plan(state))
 	_apply_plan(state, stage.plan)
 	records.append_array(stage.records)
-	return {"contributions": contributions, "records": records, "sleeping": sleeping}
+	Characters.sync(state, DEFINITIONS)
+	return {"contributions": contributions, "records": records, "sleeping": sleeping, "messages": messages}
 
 static func _plan(state: Dictionary) -> Dictionary:
 	var affinity: Dictionary = {}
@@ -425,7 +501,7 @@ static func _plan(state: Dictionary) -> Dictionary:
 
 static func _metadata(state: Dictionary, actor: int = -1, action: int = -1) -> Dictionary:
 	var profile := project_for_year(state)
-	var metadata := {"actor_id": DEFINITIONS[actor].id if actor >= 0 else "", "action_id": action,
+	var metadata := {"action_serial": int(state.get("action_serial", 0)), "actor_id": DEFINITIONS[actor].id if actor >= 0 else "", "action_id": action,
 		"action_kind": "invite" if action == 0 else ("task" if action > 0 else ""),
 		"project": profile, "project_id": profile.get("id", ""),
 		"title": profile.get("title", ""),
@@ -527,6 +603,7 @@ static func _resolve_annual_award(state: Dictionary, records: Array) -> Dictiona
 	records.append_array(stage.records)
 	_apply_plan(state, stage.plan)
 	var annual := {"year": int(state.year), "project": project_for_year(state), "work": state.work.duplicate(true),
+		"project_traits": Characters.traits(state).duplicate(true),
 		"score": score, "awards": awards, "reward": roundi(float(stage.plan.inspiration)),
 		"trait": score.trait, "bug_disaster": bug_disaster,
 		"bug_probability": bug_disaster_probability(float(state.work.get("b", 0.0)))}
@@ -578,17 +655,22 @@ static func valid_state(value: Variant) -> bool:
 		for year_key in value.completed_tasks:
 			if not year_key is String or not year_key.is_valid_int() or str(int(year_key)) != year_key or int(year_key) < 1 or int(year_key) > int(value.year) or not value.completed_tasks[year_key] is Array: return false
 			var tasks: Array = value.completed_tasks[year_key]
-			if tasks.size() > 1 or (tasks.size() == 1 and tasks[0] != "art_concept"): return false
+			var known_tasks: Array = ["art_concept"]
+			for task in Characters.TASKS: known_tasks.append(task.id)
+			var seen_tasks: Array = []
+			for task in tasks:
+				if task not in known_tasks or task in seen_tasks: return false
+				seen_tasks.append(task)
 	for member_id in DEFINITIONS.size():
 		var member: Variant = value.members[member_id]
-		if not member is Dictionary or not member.has_all(["affinity", "role", "learned_skills", "recruited"]) or not member.recruited is bool:
+		if not member is Dictionary or not member.has_all(["affinity", "role", "learned_skills", "recruited", "ability_growth"]) or not member.recruited is bool:
 			return false
 		if member.get("id", "") != DEFINITIONS[member_id].id:
 			return false
 		if member.has("ability_growth"):
 			if not member.ability_growth is Array or member.ability_growth.size() != 4: return false
-			for amount in member.ability_growth:
-				if not _finite_range(amount, 0, 100000): return false
+			for stat in 4:
+				if not _finite_range(member.ability_growth[stat], -float(DEFINITIONS[member_id].stats[stat]), 100000): return false
 		if not _finite_range(member.affinity, 0, AFFINITY_MAX) or not _finite_range(member.role, 0, 3) or not member.learned_skills is Array:
 			return false
 		var known: Array = DEFINITIONS[member_id].skills.map(func(slot: Dictionary): return slot.skill_id)
@@ -599,7 +681,7 @@ static func valid_state(value: Variant) -> bool:
 			learned_ids.append(skill_id)
 		if float(member.role) != int(member.role) or float(member.affinity) != int(member.affinity):
 			return false
-	if not _valid_recruitment(value): return false
+	if not _valid_recruitment(value) or not Characters.valid(value, DEFINITIONS): return false
 	var runtime_max_year := maxi(3, int(value.year))
 	if not SkillRunner.valid_runtime(value.skill_runtime, value.members, runtime_max_year) or not SkillRunner.valid_records(value.skill_log, value.members): return false
 	for key in ["g", "i", "p", "b"]:

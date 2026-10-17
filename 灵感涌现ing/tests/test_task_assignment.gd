@@ -27,6 +27,8 @@ func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
+	# 基础职责公式使用明确样本；正式其他角色不再是零属性占位。
+	for definition in Model.DEFINITIONS: definition.stats = [0.0, 0.0, 0.0, 0.0]
 	Model.DEFINITIONS[0].stats = [10, 20, 30, 40]
 	var initial: Dictionary = Model.select_project(Roster.fresh(), "任务检查", "act", "modern", 1).state
 	var factor := Model.task_output_factor(initial, 0, "art_concept")

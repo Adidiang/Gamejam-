@@ -203,6 +203,7 @@ func display_member(state: Dictionary, member_id: int, character_id: String) -> 
 	var exhausted := Model.action_steps(state) <= 0
 	# 耗尽时只变灰，保留点击事件以展示“本回合已行动”。
 	for action_button in [task_button, invite_button]:
+		exhausted = Model.action_steps(state) <= 0 and not (action_button == task_button and Model.Characters.free_task(state, Model.DEFINITIONS, member_id))
 		action_button.disabled = false
 		action_button.add_theme_stylebox_override("normal", _style(Color("a4aaa4") if exhausted else TEAL))
 		action_button.add_theme_stylebox_override("hover", _style(Color("a4aaa4") if exhausted else TEAL.lightened(0.1)))
@@ -214,6 +215,8 @@ func display_member(state: Dictionary, member_id: int, character_id: String) -> 
 	portrait_view.texture = CharacterTable.portrait_texture(definition.portrait)
 	portrait_placeholder.visible = portrait_view.texture == null
 	modifiers_label.text = "其他修正：" + _filled(definition.other_modifiers)
+	if definition.id == "j" and Model.Characters.has_skill(state, Model.DEFINITIONS, member_id, 2): modifiers_label.text = "其他修正：永久 BUG 产出 +100%"
+	if definition.id == "e": modifiers_label.text += "\n两个维度：绿值已交换程序与脑洞，成长仍计入原属性。"
 	var base_values := Model.base_ability(member_id, state)
 	var final_values := Model.ability(state, member_id)
 	for index in stat_base_values.size():
@@ -243,9 +246,9 @@ func display_member(state: Dictionary, member_id: int, character_id: String) -> 
 		skill_statuses[index].text = status.text
 		skill_statuses[index].add_theme_color_override("font_color", TEAL if status.active else MUTED)
 		skill_buttons[index].visible = skill.acquisition == "inspiration"
-		skill_buttons[index].text = "已习得" if status.active else "习得 · %d 灵感" % skill.inspiration_cost
+		skill_buttons[index].text = "已习得" if status.active else ("习得 · 获得 %d 灵感" % -skill.inspiration_cost if skill.inspiration_cost < 0 else "习得 · %d 灵感" % skill.inspiration_cost)
 		skill_buttons[index].disabled = not status.can_learn
-		skill_buttons[index].tooltip_text = "解锁后支付灵感习得，不消耗月份。"
+		skill_buttons[index].tooltip_text = "习得后立即获得50灵感，同时永久增加BUG产出；只能领取一次。" if skill.inspiration_cost < 0 else "解锁后支付灵感习得，不消耗月份。"
 
 func _request_learning(slot_index: int) -> void:
 	learn_requested.emit(selected_member, slot_index)

@@ -21,6 +21,11 @@ func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
+	# 公式测试使用明确的零属性、无偏好样本，避免正式十人数据干扰。
+	for definition in Model.DEFINITIONS:
+		definition.stats = [0.0, 0.0, 0.0, 0.0]
+		definition.genre = ""
+		definition.topic = ""
 	for id in 4:
 		Model.DEFINITIONS[id].stats = [10, 20, 30, 40]
 	var initial: Dictionary = Model.select_project(Roster.fresh(), "工作测试", "act", "modern", 1).state

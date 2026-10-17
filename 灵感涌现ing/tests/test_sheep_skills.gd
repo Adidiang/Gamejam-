@@ -192,8 +192,8 @@ func _run() -> void:
 	check(JSON.stringify(state) == snapshot, "Random preview does not change incoming state")
 	check(not Model.execute_task(first.state, 0, "art_concept", 1, 1).ok, "Repeated commit cannot duplicate random growth")
 	var damaged: Dictionary = sleep_work.state.duplicate(true)
-	damaged.members[0].ability_growth[1] = -1
-	check(not Model.valid_state(damaged), "Negative permanent growth is rejected by save validation")
+	damaged.members[0].ability_growth[1] = -101
+	check(not Model.valid_state(damaged), "Growth that makes base ability negative is rejected by save validation")
 	damaged = sleep_work.state.duplicate(true)
 	damaged.skill_runtime.next_task_double.owner_id = "missing"
 	check(not Model.valid_state(damaged), "Unknown flag owner is rejected")

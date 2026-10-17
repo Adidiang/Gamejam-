@@ -49,7 +49,8 @@ static func validate(value: Variant) -> String:
 			var skill: Variant = row.skills[index]
 			if not skill is Dictionary or not skill.has_all(["skill_id", "unlock_affinity"]):
 				return "%s 的技能位缺少字段。" % row.id
-			if not skill.skill_id is String or skill.skill_id not in SkillTable.skills or skill.skill_id in skill_ids or skill.unlock_affinity != SKILL_THRESHOLDS[index]:
+			var threshold: int = 0 if row.id == "j" and index == 2 else SKILL_THRESHOLDS[index]
+			if not skill.skill_id is String or skill.skill_id not in SkillTable.skills or skill.skill_id in skill_ids or skill.unlock_affinity != threshold:
 				return "%s 的三个技能需要有效且不重复的 ID，以及 0/20/50 解锁门槛。" % row.id
 			skill_ids.append(skill.skill_id)
 		if not row.portrait.is_empty() and not row.portrait.begins_with("res://"):

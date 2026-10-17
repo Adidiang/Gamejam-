@@ -3,7 +3,7 @@
     {
       "id": "a_skill_1",
       "name": "白日梦",
-      "description": "自己工作或执行任务时有50%概率睡着，取消本次产出。任务仍消耗行动步数，但保留年度任务次数。",
+      "description": "工作与完成任务时，可能会不小心睡着\n在自己的月末工作和分配任务时有50%概率触发睡着，取消自己的本次工作或任务产出，输出“睡着了...”文本。分配任务的行动步数正常消耗，但年度任务次数不消耗；其他社员和邀约不受影响",
       "quip": "我再确认一遍，她只是连睡了一个星期而不是死了对吧？",
       "acquisition": "auto",
       "inspiration_cost": 0,
@@ -40,7 +40,7 @@
     {
       "id": "a_skill_2",
       "name": "梦境讲述",
-      "description": "每次睡着，自己的脑洞白值+10，其余当前社员脑洞白值+5。本局内保留成长。",
+      "description": "每次睡着都会使自己脑洞+10，其他所有成员脑洞+5\n直接加本局属性白值，不改写角色表；本局跨年保留，新游戏清零",
       "quip": "",
       "acquisition": "inspiration",
       "inspiration_cost": 10,
@@ -80,7 +80,7 @@
     {
       "id": "a_skill_3",
       "name": "梦想家",
-      "description": "每次睡着后，当前作品任意社员的下一次成功任务产出翻倍，只影响作品属性和灵感。标记不叠加，跨年清除。",
+      "description": "每次睡着后，下一个任务产出翻倍\n给当前项目增加一个不能叠加的标记，任意社员下一次成功分配任务时使用；只对作品产出和任务灵感翻倍，好感和永久成长不翻倍；睡着的任务保留标记，当前项目跨年后清除",
       "quip": "",
       "acquisition": "inspiration",
       "inspiration_cost": 20,
@@ -115,246 +115,273 @@
     },
     {
       "id": "b_skill_1",
-      "name": "",
-      "description": "",
+      "name": "情绪泡泡",
+      "description": "邀约额外+5好感度。",
       "quip": "",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "b_skill_2",
-      "name": "",
-      "description": "",
+      "name": "记忆分享",
+      "description": "与新伙伴分享曾经的有趣事情，添加“记忆分享”任务，将一名好感度最低的成员提升至与自己相同的好感度。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 5,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "b_skill_3",
-      "name": "",
-      "description": "",
+      "name": "不散童话",
+      "description": "下一年额外吸引一位成员。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 30,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "c_skill_1",
-      "name": "",
-      "description": "",
+      "name": "协奏",
+      "description": "拥有此技能的角色共享技能习得进度",
       "quip": "",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "c_skill_2",
-      "name": "",
-      "description": "",
+      "name": "悄悄排练",
+      "description": "与南瓜小幽灵悄悄排练，每次完成任务音乐+5，为项目增加两个「小生物」",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "c_skill_3",
-      "name": "",
-      "description": "",
+      "name": "小小交响团",
+      "description": "每个「小生物」使表现力产出+10%。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 40,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "d_skill_1",
-      "name": "",
-      "description": "",
-      "quip": "",
+      "name": "食BUG者",
+      "description": "当前项目每有一个BUG，属性+1%。",
+      "quip": "既然都有电脑成精了，吃BUG为生好像也不足为奇...",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "d_skill_2",
-      "name": "",
-      "description": "",
+      "name": "手感优化",
+      "description": "每修复一个BUG，增加一点游戏性。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 5,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "d_skill_3",
-      "name": "",
-      "description": "",
+      "name": "掘地三尺",
+      "description": "整体重构以解决所有BUG，添加“系统重构”任务",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 25,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "e_skill_1",
-      "name": "",
-      "description": "",
-      "quip": "",
+      "name": "两个维度",
+      "description": "同时处于现实世界和数字世界，脑洞视为程序，程序视为脑洞。",
+      "quip": "也许他的本体其实是猫？",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "e_skill_2",
-      "name": "",
-      "description": "",
+      "name": "技术托管",
+      "description": "每修复一次BUG，随机一名成员的程序+5。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "e_skill_3",
-      "name": "",
-      "description": "",
-      "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "name": "六手并行",
+      "description": "产出+66%。",
+      "quip": "一双手写代码，一双手查文档，还有一双在撤回前两双的提交。",
+      "acquisition": "inspiration",
+      "inspiration_cost": 30,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "f_skill_1",
-      "name": "",
-      "description": "",
+      "name": "蜻蜓尾羽",
+      "description": "每年的第一次任务不消耗行动步数。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "f_skill_2",
-      "name": "",
-      "description": "",
+      "name": "风格化",
+      "description": "添加“风格化”任务，根据表现力增加大量创新性。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 30,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "f_skill_3",
-      "name": "",
-      "description": "",
+      "name": "绝对色感",
+      "description": "美术+20%，每有一点脑洞再额外加2%。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 40,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "g_skill_1",
-      "name": "",
-      "description": "",
+      "name": "飞行写生",
+      "description": "召唤小蝴蝶四处写生，每月美术+2，每月为项目增加一个「小生物」",
       "quip": "",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "g_skill_2",
-      "name": "",
-      "description": "",
+      "name": "见闻分享",
+      "description": "每次工作和任务额外产出1灵感。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "g_skill_3",
-      "name": "",
-      "description": "",
+      "name": "绘梦成真",
+      "description": "添加“绘梦成真”任务，可以使游戏项目的特质数量翻倍",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 30,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "h_skill_1",
-      "name": "",
-      "description": "",
+      "name": "协奏",
+      "description": "拥有此技能的角色共享技能习得进度",
       "quip": "",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "h_skill_2",
-      "name": "",
-      "description": "",
+      "name": "超声波",
+      "description": "增加“声音传导构建”任务，根据程序、音乐和「小生物」产出大量游戏性和表现力",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 40,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "h_skill_3",
-      "name": "",
-      "description": "",
+      "name": "多声源定位",
+      "description": "呼唤小蝙蝠辅助工作，立刻为项目增加五个「小生物」。每个「小生物」使程序+1，音乐+1。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 15,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "i_skill_1",
-      "name": "",
-      "description": "",
+      "name": "乌鸦手稿",
+      "description": "工作与完成任务时，每产出100创新性，为项目增加一份「手稿」。每份「手稿」增加1%表现力产出。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 5,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "i_skill_2",
-      "name": "",
-      "description": "",
+      "name": "乌鸦智慧",
+      "description": "聆听乌鸦教诲，获得等于美术与音乐之和的脑洞属性。每月为项目增加一个「小生物」",
       "quip": "",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "i_skill_3",
-      "name": "",
-      "description": "",
+      "name": "造世主",
+      "description": "创造多部作品共通的宏大世界观，添加“大一统世界观”任务。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 30,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "j_skill_1",
-      "name": "",
-      "description": "",
-      "quip": "",
+      "name": "微醺奇想",
+      "description": "每次工作必定进入一种状态：50%微醺（创新性产出+100%）；50%喝醉（本次工作脑洞临时+50%、BUG产出+100%，结算加成后再额外增加5个BUG）。不影响任务。",
+      "quip": "有一位著名僧侣说过：“酒可是百药之长。”",
       "acquisition": "auto",
       "inspiration_cost": 0,
-      "triggers": []
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "j_skill_2",
-      "name": "",
-      "description": "",
+      "name": "天使恩赐",
+      "description": "邀请一起喝酒，每次工作进入喝醉状态使随机一名成员程序-5，脑洞+10。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": 10,
+      "triggers": [],
+      "implementation": "character_rules"
     },
     {
       "id": "j_skill_3",
-      "name": "",
-      "description": "",
+      "name": "不醉不归",
+      "description": "永久 BUG 产出+100%。0好感即可习得，立即获得50灵感；本局只能习得一次。",
       "quip": "",
-      "acquisition": "auto",
-      "inspiration_cost": 0,
-      "triggers": []
+      "acquisition": "inspiration",
+      "inspiration_cost": -50,
+      "triggers": [],
+      "implementation": "character_rules"
     }
   ]
 }

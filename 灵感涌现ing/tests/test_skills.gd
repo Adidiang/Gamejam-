@@ -57,7 +57,7 @@ func _run() -> void:
 	var production: Variant = JSON.parse_string(FileAccess.get_file_as_string(Table.PATH))
 	check(Table.validate(production).is_empty(), "Production skill table validates")
 	for member in originals:
-		check(member.skills.map(func(slot: Dictionary): return int(slot.unlock_affinity)) == [0, 20, 50], "Three skill thresholds")
+		check(member.skills.map(func(slot: Dictionary): return int(slot.unlock_affinity)) == ([0, 20, 0] if member.id == "j" else [0, 20, 50]), "Documented skill thresholds including angel exception")
 
 	## 1. 付费技能配置校验
 	reset_fixture()
@@ -185,7 +185,9 @@ func _run() -> void:
 		var third := Model.execute_invite(year_two, 0, 2, 1)
 		check(third.report.skill_events.size() == (0 if frequency == "run" else 1), "Frequency behavior across year IDs: " + frequency)
 		var empty_plan := Model._plan(third.state)
-		var replay := Runner.run(third.state, Model.DEFINITIONS, "ACTION_AFTER", Model._metadata(third.state, 0, 0), empty_plan)
+		var replay_metadata := Model._metadata(third.state, 0, 0)
+		replay_metadata.action_serial = int(third.state.action_serial) - 1
+		var replay := Runner.run(third.state, Model.DEFINITIONS, "ACTION_AFTER", replay_metadata, empty_plan)
 		check(replay.records.is_empty() and replay.plan.inspiration == 0, "Same stage event cannot replay: " + frequency)
 
 	## 9. 临时修正：建立当月职责修正并在下个月过期

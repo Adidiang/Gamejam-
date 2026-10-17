@@ -46,7 +46,11 @@ func _run() -> void:
 	check(initial.members.size() == 10 and Model.recruited_ids(initial).is_empty(), "All ten characters start unrecruited")
 	check(Model.valid_state(initial), "Empty-club initial state is valid")
 	check(Model.DEFINITIONS.all(func(row: Dictionary): return row.join_text == ""), "All join texts are initially blank")
-	check(Model.DEFINITIONS.slice(1).all(func(row: Dictionary): return row.genre.is_empty() and row.topic.is_empty()), "Placeholder preferences remain unconfigured")
+	check(Model.DEFINITIONS.all(func(row: Dictionary): return not row.genre.is_empty() or not row.topic.is_empty()), "All ten production preferences are filled")
+	# 招募流程单独使用只有绵羊匹配的样本；正式十人组合由角色技能测试覆盖。
+	for row in Model.DEFINITIONS.slice(1):
+		row.genre = ""
+		row.topic = ""
 	var invalid := Table.table.duplicate(true)
 	invalid.characters[0].join_text = 1
 	check(not Table.validate(invalid).is_empty(), "Join text must be a string")

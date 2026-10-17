@@ -42,19 +42,19 @@ func _ready() -> void:
 	scroll.add_child(tasks_column)
 	hide()
 
-func open(state: Dictionary) -> void:
+func open(state: Dictionary, member_id: int = -1) -> void:
 	pending = false
 	for child in tasks_column.get_children():
 		tasks_column.remove_child(child)
 		child.queue_free()
 	task_buttons.clear()
-	for task in Model.available_tasks(state):
+	for task in Model.available_tasks(state, member_id):
 		var button := Button.new()
-		button.text = "%s\n消耗 %d 行动步数 · 每年一次" % [task.name, task.cost]
+		button.text = "%s\n消耗 %d 行动步数 · 每年一次" % [task.name, 0 if Model.Characters.free_task(state, Model.DEFINITIONS, member_id) else task.cost]
 		button.custom_minimum_size.y = 96
 		button.add_theme_font_size_override("font_size", 20)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		button.tooltip_text = "无前置。使用增幅后的属性：\n表现力＝脑洞＋美术\n创新性＝表现力×系数\n系数＝脑洞÷max(美术, 1)，限制在 0.1～2（仅此任务）"
+		button.tooltip_text = task.get("description", "无前置。使用增幅后的属性：\n表现力＝脑洞＋美术\n创新性＝表现力×系数\n系数＝脑洞÷max(美术, 1)，限制在 0.1～2（仅此任务）")
 		var button_style := StyleBoxFlat.new()
 		button_style.bg_color = Color("2a6965")
 		button.add_theme_stylebox_override("normal", button_style)
