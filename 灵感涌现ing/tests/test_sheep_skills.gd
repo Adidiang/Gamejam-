@@ -195,8 +195,8 @@ func _run() -> void:
 	check(JSON.stringify(state) == snapshot, "Random preview does not change incoming state")
 	check(not Model.execute_task(first.state, 0, "art_concept", 1, 1).ok, "Repeated commit cannot duplicate random growth")
 	var damaged: Dictionary = sleep_work.state.duplicate(true)
-	damaged.members[0].ability_growth[1] = -1
-	check(not Model.valid_state(damaged), "Negative permanent growth is rejected by save validation")
+	damaged.members[0].ability_growth[1] = -101
+	check(not Model.valid_state(damaged), "Growth that makes base ability negative is rejected by save validation")
 	damaged = sleep_work.state.duplicate(true)
 	damaged.skill_runtime.next_task_double.owner_id = "missing"
 	check(not Model.valid_state(damaged), "Unknown flag owner is rejected")
@@ -205,7 +205,7 @@ func _run() -> void:
 	check(not Model.valid_state(damaged), "Unknown outcome cannot enter a valid save")
 	var legacy := ready(false)
 	for member in legacy.members: member.erase("ability_growth")
-	check(Model.valid_state(legacy) and near(Model.base_ability(0, legacy)[1], 100), "Existing saves without growth fields retain zero-growth defaults")
+	check(not Model.valid_state(legacy) and near(Model.base_ability(0, legacy)[1], 100), "Current save schema rejects missing growth fields; read-only ability preview retains its fallback")
 
 	# 用户能看见三技能的真实结果，而非只有后台数值变化。
 	var sheet := Sheet.new()

@@ -9,6 +9,7 @@ static func without_effects() -> Dictionary:
 	for skill_id in original:
 		Table.skills[skill_id] = original[skill_id].duplicate(true)
 		Table.skills[skill_id].triggers = []
+		Table.skills[skill_id].implementation = "triggers"
 	return original
 
 static func restore(original: Dictionary) -> void:

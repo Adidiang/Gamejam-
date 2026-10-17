@@ -20,6 +20,10 @@ func _initialize() -> void:
 func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
+	var production_definitions := Model.DEFINITIONS.duplicate(true)
+	for row in Model.DEFINITIONS.slice(1):
+		row.genre = ""
+		row.topic = ""
 	var initial := Roster.fresh()
 	check(Model.valid_state(initial) and Model.needs_project_selection(initial), "年初待选择状态可存档")
 	check(not Model.advance_work(initial, 1, 1).ok and Model.available_tasks(initial).is_empty() and not Model.execute_invite(initial, 0, 1, 1).ok, "未选择作品时拒绝工作和行动")
@@ -190,5 +194,6 @@ func _run() -> void:
 	check(scene.main_screen.visible and scene.state.year == 2 and Model.project_for_year(scene.state, 1).title == "UI 测试游戏", "次年确认进入主界面并保留第一年档案")
 	scene.queue_free()
 	await process_frame
+	Model.DEFINITIONS = production_definitions
 	print("Game selection: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)

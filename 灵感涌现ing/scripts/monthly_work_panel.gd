@@ -182,6 +182,8 @@ func _show_values(fraction: float, id: int) -> void:
 		lines.append("%s  %s" % [CAPTIONS[index], NumberDisplay.text(float(contribution[KEYS[index]]) * fraction, true)])
 	lines.append("灵感 %+d" % int(contribution.get("inspiration", 0)))
 	value_labels[id].text = "   ·   ".join(lines.slice(0, 3)) + "\n" + "   ·   ".join(lines.slice(3))
+	var messages: Array = report.get("character_messages", {}).get(Model.DEFINITIONS[id].id, [])
+	if not messages.is_empty(): value_labels[id].text += "\n" + " · ".join(messages)
 
 ## 底部汇总只看本回合全员岗位产出的合计，不显示作品累计（累计值在主界面属性栏）。
 func _month_summary_text() -> String:
@@ -213,8 +215,9 @@ func _finish() -> void:
 	for id in report.members.size():
 		var before_growth: Array = report.get("members_before", report.members)[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
 		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
-		var gain := float(after_growth[1]) - float(before_growth[1])
-		if not is_zero_approx(gain): growth_messages.append("%s 脑洞白值 %s" % [report.members[id].id, NumberDisplay.text(gain, true)])
+		for stat in 4:
+			var gain := float(after_growth[stat]) - float(before_growth[stat])
+			if not is_zero_approx(gain): growth_messages.append("%s %s白值 %s" % [Model.DEFINITIONS[id].name, ["程序", "脑洞", "美术", "音乐"][stat], NumberDisplay.text(gain, true)])
 	if not growth_messages.is_empty(): summary_label.text += "\n" + " · ".join(growth_messages)
 	finish_button.disabled = false
 	finish_button.grab_focus()

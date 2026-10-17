@@ -19,6 +19,12 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var skills := SkillFixture.without_effects()
+	# 终局分数使用无人、无招募的固定样本；十人真实组合由角色测试覆盖。
+	var definitions: Array = Model.DEFINITIONS
+	Model.DEFINITIONS = definitions.duplicate(true)
+	for definition in Model.DEFINITIONS:
+		definition.genre = ""
+		definition.topic = ""
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var state := Model.fresh()
@@ -184,5 +190,6 @@ func _run() -> void:
 	scene.queue_free()
 	await process_frame
 	SkillFixture.restore(skills)
+	Model.DEFINITIONS = definitions
 	print("Settlement: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)

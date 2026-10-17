@@ -14,7 +14,7 @@
   "characters": [
     {
       "id": "a",
-      "name": "代号sheep",
+      "name": "索姆妮娅",
       "attributes": {
         "programming": 10,
         "imagination": 100,
@@ -44,16 +44,16 @@
     },
     {
       "id": "b",
-      "name": "",
+      "name": "奈布莉丝",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 40,
+        "imagination": 40,
+        "art": 40,
+        "music": 40
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "剧情向",
+      "preferred_topic": "现代",
       "skills": [
         {
           "skill_id": "b_skill_1",
@@ -74,16 +74,16 @@
     },
     {
       "id": "c",
-      "name": "",
+      "name": "南莉奥菈",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 10,
+        "imagination": 35,
+        "art": 15,
+        "music": 80
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "剧情向",
+      "preferred_topic": "惊悚",
       "skills": [
         {
           "skill_id": "c_skill_1",
@@ -104,16 +104,16 @@
     },
     {
       "id": "d",
-      "name": "",
+      "name": "夏洛克 · 怀特拉特",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 90,
+        "imagination": 30,
+        "art": 10,
+        "music": 10
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "策略、射击",
+      "preferred_topic": "惊悚",
       "skills": [
         {
           "skill_id": "d_skill_1",
@@ -134,16 +134,16 @@
     },
     {
       "id": "e",
-      "name": "",
+      "name": "泽尔克",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 25,
+        "imagination": 95,
+        "art": 10,
+        "music": 10
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "策略、模拟经营",
+      "preferred_topic": "科幻",
       "skills": [
         {
           "skill_id": "e_skill_1",
@@ -164,16 +164,16 @@
     },
     {
       "id": "f",
-      "name": "",
+      "name": "西尔瓦莉丝",
       "attributes": {
         "programming": 0,
-        "imagination": 0,
-        "art": 0,
+        "imagination": 40,
+        "art": 100,
         "music": 0
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "ACT",
+      "preferred_topic": "历史",
       "skills": [
         {
           "skill_id": "f_skill_1",
@@ -194,16 +194,16 @@
     },
     {
       "id": "g",
-      "name": "",
+      "name": "莫缇艾尔",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 20,
+        "imagination": 40,
+        "art": 50,
+        "music": 40
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "RPG",
+      "preferred_topic": "奇幻",
       "skills": [
         {
           "skill_id": "g_skill_1",
@@ -224,15 +224,15 @@
     },
     {
       "id": "h",
-      "name": "",
+      "name": "瓦尔索恩",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
+        "programming": 50,
+        "imagination": 10,
         "art": 0,
-        "music": 0
+        "music": 90
       },
       "affinity": 0,
-      "preferred_genre": "",
+      "preferred_genre": "ACT、射击",
       "preferred_topic": "",
       "skills": [
         {
@@ -254,16 +254,16 @@
     },
     {
       "id": "i",
-      "name": "",
+      "name": "科尔维努斯",
       "attributes": {
-        "programming": 0,
-        "imagination": 0,
-        "art": 0,
-        "music": 0
+        "programming": 15,
+        "imagination": 75,
+        "art": 30,
+        "music": 30
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "RPG",
+      "preferred_topic": "历史",
       "skills": [
         {
           "skill_id": "i_skill_1",
@@ -284,16 +284,16 @@
     },
     {
       "id": "j",
-      "name": "",
+      "name": "凯伦",
       "attributes": {
         "programming": 0,
-        "imagination": 0,
+        "imagination": 85,
         "art": 0,
-        "music": 0
+        "music": 55
       },
       "affinity": 0,
-      "preferred_genre": "",
-      "preferred_topic": "",
+      "preferred_genre": "模拟经营",
+      "preferred_topic": "现代",
       "skills": [
         {
           "skill_id": "j_skill_1",
@@ -305,7 +305,7 @@
         },
         {
           "skill_id": "j_skill_3",
-          "unlock_affinity": 50
+          "unlock_affinity": 0
         }
       ],
       "other_modifiers": "",

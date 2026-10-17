@@ -28,7 +28,7 @@ func _run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1440, 900)
 	var definitions: Array = Model.DEFINITIONS.duplicate(true)
-	for id in 4:
+	for id in Model.DEFINITIONS.size():
 		Model.DEFINITIONS[id].stats = [0.0, 0.0, 0.0, 0.0]
 	check(near(Model.bug_disaster_probability(0.0), 0.0) and near(Model.bug_disaster_probability(20.0), 0.0), "20 只 Bug 以内不判定")
 	check(near(Model.bug_disaster_probability(20.9), 0.0) and near(Model.bug_disaster_probability(21.0), 0.01), "小数向下取整后 21 只对应 1%")

@@ -108,6 +108,11 @@ func _show_results() -> void:
 	var asleep: bool = Model.DEFINITIONS[int(report.member)].id in report.get("sleeping_member_ids", [])
 	if asleep:
 		lines.append("睡着了…\n本次任务没有产出；行动步数已消耗，年度任务次数保留。")
+	if report.get("free_task", false): lines.append("蜻蜓尾羽：本次任务不消耗行动步数。")
+	for message in report.get("character_messages", []): lines.append(str(message))
+	for key in ["manuscripts", "creatures"]:
+		var change := int(report.get("project_traits", {}).get(key, 0)) - int(report.get("traits_before", {}).get(key, 0))
+		if change != 0: lines.append("%s %+d" % ["手稿" if key == "manuscripts" else "小生物", change])
 	if float(report.get("task_multiplier", 1.0)) > 1.0:
 		lines.append("梦想家：本次任务产出翻倍，标记已消耗。")
 ## 任务产出只列作品属性；邀约不产出作品属性。
@@ -121,9 +126,9 @@ func _show_results() -> void:
 	for id in report.members.size():
 		var before_growth: Array = report.members_before[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
 		var after_growth: Array = report.members[id].get("ability_growth", [0.0, 0.0, 0.0, 0.0])
-		var imagination_gain := float(after_growth[1]) - float(before_growth[1])
-		if not is_zero_approx(imagination_gain):
-			lines.append("%s 脑洞白值 %s" % [report.members[id].id, NumberDisplay.text(imagination_gain, true)])
+		for stat in 4:
+			var gain := float(after_growth[stat]) - float(before_growth[stat])
+			if not is_zero_approx(gain): lines.append("%s %s白值 %s" % [Model.DEFINITIONS[id].name, ["程序", "脑洞", "美术", "音乐"][stat], NumberDisplay.text(gain, true)])
 		var gain := int(report.members[id].affinity) - int(report.members_before[id].affinity)
 		if gain != 0 or (invited and id == int(report.member)):
 			lines.append("%s 好感度 %+d" % [report.members[id].id, gain])

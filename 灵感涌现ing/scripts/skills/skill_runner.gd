@@ -6,9 +6,9 @@ const Numeric = preload("res://scripts/skills/effects/numeric_modifier.gd")
 
 static func active(state: Dictionary, member_id: int, slot: Dictionary) -> bool:
 	var skill = Table.skills.get(slot.skill_id)
-	if not bool(state.members[member_id].get("recruited", false)) or skill == null or skill.display_name.is_empty() or int(state.members[member_id].affinity) < int(slot.unlock_affinity):
+	if not bool(state.members[member_id].get("recruited", false)) or skill == null or skill.display_name.is_empty():
 		return false
-	return skill.acquisition == "auto" or slot.skill_id in state.members[member_id].learned_skills
+	return slot.skill_id in state.members[member_id].learned_skills or (skill.acquisition == "auto" and int(state.members[member_id].affinity) >= int(slot.unlock_affinity))
 
 static func status(state: Dictionary, member_id: int, slot: Dictionary) -> Dictionary:
 	if not bool(state.members[member_id].get("recruited", false)): return {"text": "未招募", "can_learn": false, "active": false}
@@ -16,7 +16,7 @@ static func status(state: Dictionary, member_id: int, slot: Dictionary) -> Dicti
 	if skill == null: return {"text": "技能配置缺失", "can_learn": false, "active": false}
 	var prefix := "%d 好感度解锁" % int(slot.unlock_affinity)
 	if skill.display_name.is_empty(): return {"text": prefix + " · 内容待填写", "can_learn": false, "active": false}
-	if int(state.members[member_id].affinity) < int(slot.unlock_affinity):
+	if int(state.members[member_id].affinity) < int(slot.unlock_affinity) and not active(state, member_id, slot):
 		return {"text": prefix + " · 未解锁", "can_learn": false, "active": false}
 	if active(state, member_id, slot):
 		return {"text": prefix + (" · 自动生效" if skill.acquisition == "auto" else " · 已习得"), "can_learn": false, "active": true}
@@ -27,6 +27,7 @@ static func status(state: Dictionary, member_id: int, slot: Dictionary) -> Dicti
 static func run(state: Dictionary, definitions: Array, hook: String, metadata: Dictionary, base_plan: Dictionary) -> Dictionary:
 	var plan := base_plan.duplicate(true)
 	var event_id := "%s:%d:%d:%s" % [state.run_id, int(state.year), 0 if hook.begins_with("PROJECT_") else int(state.month), hook]
+	if hook.begins_with("ACTION_"): event_id += ":%d" % int(metadata.get("action_serial", state.get("action_serial", 0)))
 	if state.skill_runtime.events.has(event_id): return {"plan": plan, "records": [], "sleeping": [], "task_multiplier": 1.0}
 	clear_expired_project_effect(state)
 	var snapshot := state.duplicate(true)
